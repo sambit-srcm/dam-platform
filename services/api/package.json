@@ -1,0 +1,16 @@
+{
+  "name": "@dam/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "amqplib": "^2.0.1",
+    "express": "^5.2.1",
+    "minio": "^8.0.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2"
+  }
+}
