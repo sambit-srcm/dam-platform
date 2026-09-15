@@ -13,18 +13,18 @@ A Digital Asset Management (DAM) platform for uploading, storing, processing, an
 
 ## Tech Stack
 
-| Layer | Technology |
-| --- | --- |
-| Frontend | React, Tailwind CSS, TypeScript, Vite |
-| Backend | Node.js, Express, TypeScript |
-| Load Balancer | Nginx |
-| Queue | RabbitMQ |
-| Database | PostgreSQL |
-| Cache | Redis |
-| Object Storage | MinIO (S3-compatible) |
-| Media Processing | FFmpeg, Sharp |
-| Deployment | Docker Compose (with scale configs) |
-| Package Manager | pnpm (workspaces) |
+| Layer            | Technology                            |
+| ---------------- | ------------------------------------- |
+| Frontend         | React, Tailwind CSS, TypeScript, Vite |
+| Backend          | Node.js, Express, TypeScript          |
+| Load Balancer    | Nginx                                 |
+| Queue            | RabbitMQ                              |
+| Database         | PostgreSQL                            |
+| Cache            | Redis                                 |
+| Object Storage   | MinIO (S3-compatible)                 |
+| Media Processing | FFmpeg, Sharp                         |
+| Deployment       | Docker Compose (with scale configs)   |
+| Package Manager  | pnpm (workspaces)                     |
 
 ## Architecture
 
