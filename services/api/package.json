@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@dam/db": "workspace:*",
     "@dam/queue": "workspace:*",
-    "amqplib": "^2.0.1",
     "express": "^5.2.1",
     "minio": "^8.0.7"
   },
