@@ -8,8 +8,24 @@ importers:
 
   .: {}
 
+  packages/queue:
+    dependencies:
+      amqplib:
+        specifier: ^2.0.1
+        version: 2.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.2
+        version: 22.20.2
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
   services/api:
     dependencies:
+      '@dam/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       amqplib:
         specifier: ^2.0.1
         version: 2.0.1
