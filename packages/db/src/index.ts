@@ -17,4 +17,5 @@ export async function pingDb(db: Db) {
   await db.execute(sql`select 1`);
 }
 
+export * from './queries.ts';
 export * from './schema.ts';
