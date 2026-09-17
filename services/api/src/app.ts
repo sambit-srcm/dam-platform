@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Context } from './context.ts';
 import { errorHandler, notFoundHandler } from './errors.ts';
+import { healthRoutes } from './health.ts';
 import { requestLogger } from './logger.ts';
 import { assetRoutes } from './routes/assets.ts';
 
@@ -13,10 +14,7 @@ export function createApp(ctx: Context) {
   app.use(requestLogger);
   app.use(express.json({ limit: '1mb' }));
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
-
+  app.use('/health', healthRoutes(ctx));
   app.use('/assets', assetRoutes(ctx));
 
   app.use(notFoundHandler);
