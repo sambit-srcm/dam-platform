@@ -9,7 +9,11 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
 
   DATABASE_URL: z.string(),
+  REDIS_URL: z.string(),
   AMQP_URL: z.string(),
+
+  // How long a single readiness check may take before it counts as down
+  HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),
 
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),
