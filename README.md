@@ -42,6 +42,9 @@ A Digital Asset Management (DAM) platform for uploading, storing, processing, an
 .
 ├── docs/
 │   └── architecture.jpg
+├── packages/
+│   ├── db/         Drizzle schema, migrations and database client
+│   └── queue/      RabbitMQ job queues with dead letter queues
 ├── services/
 │   ├── web/        React + Tailwind + TypeScript frontend
 │   └── api/        Express + TypeScript API service
