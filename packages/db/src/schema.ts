@@ -23,6 +23,8 @@ export const assets = pgTable(
     mimeType: text().notNull(),
     sizeBytes: bigint({ mode: 'number' }).notNull(),
     storageKey: text().notNull().unique('assets_storage_key_unique'),
+    // Set by the worker once a thumbnail has been generated
+    thumbnailKey: text(),
     status: assetStatus().notNull().default('uploaded'),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
