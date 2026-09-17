@@ -11,6 +11,15 @@ export default defineConfig([
   {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
+    rules: {
+      // Express middleware signatures need unused arguments, e.g. the error handler's next
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      // Needed to add properties to Express's Request type
+      '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
+    },
   },
   {
     files: ['services/web/**/*.{ts,tsx}'],
