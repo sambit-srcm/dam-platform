@@ -26,7 +26,8 @@ export function assetRoutes(ctx: Context) {
 
   router.post('/', upload.single('file'), async (req, res) => {
     const file = req.file;
-    if (!file) throw new ValidationError('A file is required in the "file" field');
+    if (!file)
+      throw new ValidationError('A file is required in the "file" field');
 
     const jobType = jobTypeFor(file.mimetype);
     const storageKey = `${randomUUID()}${extname(file.originalname)}`;

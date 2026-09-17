@@ -24,7 +24,11 @@ export class NotFoundError extends AppError {
   }
 }
 
-export function notFoundHandler(_req: Request, _res: Response, next: NextFunction) {
+export function notFoundHandler(
+  _req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
   next(new NotFoundError());
 }
 
