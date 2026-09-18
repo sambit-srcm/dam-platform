@@ -1,4 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
+import { MulterError } from 'multer';
+import { config } from './config.ts';
 import { logger } from './logger.ts';
 
 export class AppError extends Error {
@@ -40,6 +42,29 @@ export function errorHandler(
   _next: NextFunction,
 ) {
   const log = req.log ?? logger;
+
+  // Headers are already out, so the response can't be changed any more
+  if (res.headersSent) {
+    log.error({ err: error }, 'error after the response had started');
+    res.destroy();
+    return;
+  }
+
+  // Rejected uploads are the caller's problem, not a server fault
+  if (error instanceof MulterError) {
+    const tooLarge = error.code === 'LIMIT_FILE_SIZE';
+    log.warn({ err: error, code: error.code }, 'upload rejected');
+    res.status(tooLarge ? 413 : 400).json({
+      error: {
+        code: tooLarge ? 'file_too_large' : 'upload_error',
+        message: tooLarge
+          ? `File is larger than the ${config.MAX_UPLOAD_MB} MB limit`
+          : error.message,
+        requestId: req.id,
+      },
+    });
+    return;
+  }
 
   if (error instanceof AppError) {
     log.warn({ err: error, code: error.code }, error.message);
