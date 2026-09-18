@@ -5,7 +5,12 @@ import {
   type ConsumeMessage,
 } from 'amqplib';
 import type { JobPayloads, JobType } from './jobs.ts';
-import { JOBS_EXCHANGE, queues, setupTopology } from './topology.ts';
+import {
+  DELIVERY_LIMIT,
+  JOBS_EXCHANGE,
+  queues,
+  setupTopology,
+} from './topology.ts';
 
 export * from './jobs.ts';
 export * from './topology.ts';
@@ -52,11 +57,38 @@ export function publishJob<T extends JobType>(
 }
 
 // Runs the handler for each job. Returns a function that stops consuming.
+export type JobErrorContext<T extends JobType = JobType> = {
+  type: T;
+  queue: string;
+  /** Which attempt this was, starting at 1 */
+  attempt: number;
+  /** False means the job is being dead-lettered now */
+  willRetry: boolean;
+  /** Missing only when the message could not be parsed */
+  payload?: JobPayloads[T];
+};
+
+export type JobErrorHandler<T extends JobType = JobType> = (
+  error: unknown,
+  context: JobErrorContext<T>,
+) => void | Promise<void>;
+
+// Used when a consumer passes no onError, so a failure is never silent
+function logToConsole(error: unknown, context: JobErrorContext) {
+  console.error(
+    `job ${context.type} failed on attempt ${context.attempt} (willRetry=${context.willRetry})`,
+    error,
+  );
+}
+
 export async function consumeJobs<T extends JobType>(
   jobQueue: JobQueue,
   type: T,
   handler: JobHandler<T>,
-  { prefetch = 1 }: { prefetch?: number } = {},
+  {
+    prefetch = 1,
+    onError = logToConsole,
+  }: { prefetch?: number; onError?: JobErrorHandler<T> } = {},
 ) {
   const channel = await jobQueue.connection.createChannel();
   await channel.prefetch(prefetch);
@@ -67,11 +99,34 @@ export async function consumeJobs<T extends JobType>(
       // null means RabbitMQ cancelled the consumer, e.g. the queue was deleted
       if (!message) return;
 
+      // Quorum queues count redeliveries for us
+      const attempt =
+        Number(message.properties.headers?.['x-delivery-count'] ?? 0) + 1;
+
+      const report = async (
+        error: unknown,
+        willRetry: boolean,
+        payload?: JobPayloads[T],
+      ) => {
+        try {
+          await onError(error, {
+            type,
+            queue: queues[type].queue,
+            attempt,
+            willRetry,
+            payload,
+          });
+        } catch {
+          // A broken error handler must not take the consumer down
+        }
+      };
+
       let payload: JobPayloads[T];
       try {
         payload = JSON.parse(message.content.toString());
-      } catch {
+      } catch (error) {
         // Bad JSON will never succeed, so don't retry it
+        await report(error, false);
         channel.nack(message, false, false);
         return;
       }
@@ -82,6 +137,7 @@ export async function consumeJobs<T extends JobType>(
       } catch (error) {
         // Requeued jobs are dead-lettered once they pass DELIVERY_LIMIT
         const retry = !(error instanceof NonRetryableJobError);
+        await report(error, retry && attempt < DELIVERY_LIMIT, payload);
         channel.nack(message, false, retry);
       }
     },
