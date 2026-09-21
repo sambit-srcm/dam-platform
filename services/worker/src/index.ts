@@ -1,3 +1,4 @@
+import { markAssetFailed } from '@dam/db';
 import { consumeJobs } from '@dam/queue';
 import { config } from './config.ts';
 import { createContext } from './context.ts';
@@ -12,7 +13,20 @@ const stopConsuming = await consumeJobs(
   async ({ assetId }) => {
     await processImage(ctx, assetId);
   },
-  { prefetch: config.WORKER_PREFETCH },
+  {
+    prefetch: config.WORKER_PREFETCH,
+    onError: async (error, { type, attempt, willRetry, payload }) => {
+      logger.error(
+        { err: error, jobType: type, attempt, willRetry },
+        'job failed',
+      );
+
+      // Out of retries: record it on the asset instead of leaving it at processing
+      if (!willRetry && payload) {
+        await markAssetFailed(ctx.db, payload.assetId);
+      }
+    },
+  },
 );
 
 logger.info(
