@@ -15,6 +15,11 @@ const schema = z.object({
   // How long a single readiness check may take before it counts as down
   HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),
 
+  MINIO_PUBLIC_URL: z.string().default('http://localhost:9000'),
+  PRESIGNED_TTL_SECONDS: z.coerce.number().default(60 * 15), // 15 minutes
+  THUMBNAIL_TTL_SECONDS: z.coerce.number().default(60 * 60), // longer 1h for browser cache
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),
   MINIO_ROOT_USER: z.string(),

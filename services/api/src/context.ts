@@ -11,6 +11,7 @@ export type Context = {
   queue: JobQueue;
   redis: RedisClientType;
   storage: MinioClient;
+  publicStorage: MinioClient;
   bucket: string;
   close(): Promise<void>;
 };
@@ -20,7 +21,7 @@ export async function createContext(): Promise<Context> {
   const queue = await connectJobQueue(config.AMQP_URL);
 
   const redis = createClient({ url: config.REDIS_URL }) as RedisClientType;
-  // Without a listener, a connection error would crash the process
+
   redis.on('error', (error) => logger.error({ err: error }, 'redis error'));
   await redis.connect();
 
@@ -32,11 +33,23 @@ export async function createContext(): Promise<Context> {
     secretKey: config.MINIO_ROOT_PASSWORD,
   });
 
+  const publicUrl = new URL(config.MINIO_PUBLIC_URL);
+  const publicUseSSL = publicUrl.protocol === 'https:';
+
+  const publicStorage = new MinioClient({
+    endPoint: publicUrl.hostname,
+    port: publicUrl.port ? parseInt(publicUrl.port) : publicUseSSL ? 443 : 9000,
+    useSSL: publicUseSSL,
+    accessKey: config.MINIO_ROOT_USER,
+    secretKey: config.MINIO_ROOT_PASSWORD,
+  });
+
   return {
     db,
     queue,
     redis,
     storage,
+    publicStorage,
     bucket: config.MINIO_BUCKET,
     async close() {
       await queue.close();
