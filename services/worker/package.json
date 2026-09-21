@@ -12,6 +12,7 @@
   "dependencies": {
     "@dam/db": "workspace:*",
     "@dam/queue": "workspace:*",
+    "drizzle-orm": "^0.45.2",
     "minio": "^8.0.7",
     "pino": "^10.3.1",
     "sharp": "^0.35.4",
