@@ -12,7 +12,7 @@ export type UploadFile = {
   size: number;
 };
 
-function jobTypeFor(mimeType: string): JobType {
+export function jobTypeFor(mimeType: string): JobType {
   if (mimeType.startsWith('image/')) return 'image.process';
   if (mimeType.startsWith('video/')) return 'video.process';
   throw new ValidationError('Only image and video files are supported');
