@@ -6,9 +6,15 @@ import {
   text,
   timestamp,
   uuid,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 import { ASSET_STATUSES } from './constants.ts';
 
+export type UploadedSession = {
+  uploadId: string;
+  partSize: number;
+  partCount: number;
+};
 export const assetStatus = pgEnum('asset_status', ASSET_STATUSES);
 export const assets = pgTable(
   'assets',
@@ -21,6 +27,10 @@ export const assets = pgTable(
     // Set by the worker once a thumbnail has been generated
     thumbnailKey: text(),
     status: assetStatus().notNull().default('uploaded'),
+    upload: jsonb().$type<UploadedSession>(),
+    uploadExpiresAt: timestamp({ withTimezone: true }),
+
+    failureReason: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true })
       .notNull()
@@ -30,6 +40,7 @@ export const assets = pgTable(
   (table) => [
     index('assets_status_idx').on(table.status),
     index('assets_created_at_idx').on(table.createdAt),
+    index('assets_upload_expires_at_idx').on(table.uploadExpiresAt),
   ],
 );
 

@@ -15,6 +15,13 @@
       "when": 1789673185359,
       "tag": "0001_wooden_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790102809752,
+      "tag": "0002_fat_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }
