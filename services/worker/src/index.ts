@@ -1,4 +1,4 @@
-import { markAssetFailed } from '@dam/db';
+import { markAssetFailed } from './repository.ts';
 import { consumeJobs } from '@dam/queue';
 import { config } from './config.ts';
 import { createContext } from './context.ts';

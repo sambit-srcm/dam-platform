@@ -2,7 +2,7 @@ import { createDb, type Db } from '@dam/db';
 import { connectJobQueue, type JobQueue } from '@dam/queue';
 import { Client as MinioClient } from 'minio';
 import { createClient, type RedisClientType } from 'redis';
-import { config } from './config.ts';
+import { config } from '../../config.ts';
 import { logger } from './logger.ts';
 
 // The clients the routes work with, created once at startup

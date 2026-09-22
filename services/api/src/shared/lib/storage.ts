@@ -1,5 +1,5 @@
 import type { Asset } from '@dam/db';
-import { config } from './config.ts';
+import { config } from '../../config.ts';
 import type { Context } from './context.ts';
 
 type AssetFile = Pick<Asset, 'filename' | 'storageKey' | 'thumbnailKey'>;

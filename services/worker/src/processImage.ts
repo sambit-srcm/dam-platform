@@ -3,7 +3,7 @@ import {
   markAssetFailed,
   markAssetProcessing,
   markAssetReady,
-} from '@dam/db';
+} from './repository.ts';
 import { NonRetryableJobError } from '@dam/queue';
 import { buffer } from 'node:stream/consumers';
 import sharp from 'sharp';

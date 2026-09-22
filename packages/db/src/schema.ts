@@ -7,14 +7,9 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { ASSET_STATUSES } from './constants.ts';
 
-export const assetStatus = pgEnum('asset_status', [
-  'uploaded',
-  'processing',
-  'ready',
-  'failed',
-]);
-
+export const assetStatus = pgEnum('asset_status', ASSET_STATUSES);
 export const assets = pgTable(
   'assets',
   {
