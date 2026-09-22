@@ -1,7 +1,7 @@
 import { createApp } from './app.ts';
 import { config } from './config.ts';
-import { createContext } from './context.ts';
-import { logger } from './logger.ts';
+import { createContext } from './shared/lib/context.ts';
+import { logger } from './shared/lib/logger.ts';
 
 const ctx = await createContext();
 const server = createApp(ctx).listen(config.PORT, () => {

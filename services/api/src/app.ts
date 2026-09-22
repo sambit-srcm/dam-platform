@@ -1,8 +1,9 @@
 import express from 'express';
-import type { Context } from './context.ts';
-import { errorHandler, notFoundHandler } from './errors.ts';
+import type { Context } from './shared/lib/context.ts';
+import { errorHandler } from './shared/middlewares/errorHandler.ts';
+import { notFoundHandler } from './shared/middlewares/notFound.ts';
 import { healthRoutes } from './health.ts';
-import { requestLogger } from './logger.ts';
+import { requestLogger } from './shared/middlewares/requestLogger.ts';
 import { assetRoutes } from './routes/assets.ts';
 
 export function createApp(ctx: Context) {

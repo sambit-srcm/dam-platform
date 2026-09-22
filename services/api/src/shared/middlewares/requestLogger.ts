@@ -1,13 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { pino } from 'pino';
-import { config } from './config.ts';
-
-export const logger = pino({
-  level: config.LOG_LEVEL,
-  // Keep secrets out of the logs
-  redact: ['req.headers.authorization', 'req.headers.cookie'],
-});
+import { logger } from '../lib/logger.ts';
 
 declare global {
   namespace Express {
@@ -19,6 +12,7 @@ declare global {
 }
 
 // Gives every request an id and logs how it finished
+
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   req.id = randomUUID();
   req.log = logger.child({ requestId: req.id });

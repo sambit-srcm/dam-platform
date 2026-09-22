@@ -5,8 +5,8 @@ import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { config } from '../config.ts';
-import type { Context } from '../context.ts';
-import { ValidationError } from '../errors.ts';
+import type { Context } from '../shared/lib/context.ts';
+import { ValidationError } from '../shared/errors/AppError.ts';
 
 // Files are held in memory, which is fine for images and short videos.
 // Large uploads should stream straight to MinIO instead.

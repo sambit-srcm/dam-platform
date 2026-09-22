@@ -1,7 +1,7 @@
 import { pingDb } from '@dam/db';
 import { Router } from 'express';
 import { config } from './config.ts';
-import type { Context } from './context.ts';
+import type { Context } from './shared/lib/context.ts';
 
 type CheckResult = {
   status: 'up' | 'down';
