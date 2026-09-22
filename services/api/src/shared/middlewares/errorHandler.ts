@@ -28,7 +28,7 @@ export function errorHandler(
       error: {
         code: tooLarge ? 'file_too_large' : 'upload_error',
         message: tooLarge
-          ? `File is larger than the ${config.MAX_UPLOAD_MB} MB limit`
+          ? `File is larger than the ${config.MAX_DIRECT_UPLOAD_MB} MB limit for direct uploads`
           : error.message,
         requestId: req.id,
       },

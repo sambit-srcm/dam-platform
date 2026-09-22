@@ -20,13 +20,19 @@ const schema = z.object({
   THUMBNAIL_TTL_SECONDS: z.coerce.number().default(60 * 60), // longer 1h for browser cache
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
+  // Ceiling for a resumable multipart upload
+  MAX_UPLOAD_GB: z.coerce.number().default(5),
+  // Ceiling for the single-request upload, which is buffered in memory
+  MAX_DIRECT_UPLOAD_MB: z.coerce.number().default(25),
+  UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
+  PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
+  UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept
+
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),
   MINIO_ROOT_USER: z.string(),
   MINIO_ROOT_PASSWORD: z.string(),
   MINIO_BUCKET: z.string(),
-
-  MAX_UPLOAD_MB: z.coerce.number().default(100),
 });
 
 const parsed = schema.safeParse(process.env);
