@@ -1,5 +1,6 @@
 import { createApp } from './app.ts';
 import { config } from './config.ts';
+import { startUploadCleanup } from './modules/uploads/upload.cleanup.ts';
 import { createContext } from './shared/lib/context.ts';
 import { logger } from './shared/lib/logger.ts';
 
@@ -7,6 +8,8 @@ const ctx = await createContext();
 const server = createApp(ctx).listen(config.PORT, () => {
   logger.info({ port: config.PORT, env: config.NODE_ENV }, 'api started');
 });
+
+const stopUploadCleanup = startUploadCleanup(ctx);
 
 // Give in-flight requests this long to finish before the process exits anyway
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -19,6 +22,8 @@ function shutdown(signal: string) {
   shuttingDown = true;
 
   logger.info({ signal }, 'shutting down');
+
+  stopUploadCleanup();
 
   // Idle keep-alive connections would otherwise hold the server open
   server.closeIdleConnections();
