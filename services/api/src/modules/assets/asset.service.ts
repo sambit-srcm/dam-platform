@@ -8,7 +8,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../shared/errors/AppError.ts';
-import { createAsset, findAssetById } from './asset.repository.ts';
+import { createAsset, findAssetById, listAssets } from './asset.repository.ts';
 
 export type UploadFile = {
   buffer: Buffer;
@@ -68,4 +68,35 @@ export async function getAsset(ctx: Context, id: string) {
   if (!asset) throw new NotFoundError('Asset not found');
 
   return presentAsset(ctx, asset);
+}
+
+// Everything a gallery card needs, without handing out a download link per row
+export async function presentAssetSummary(ctx: Context, asset: Asset) {
+  const ready = HAS_OBJECT.includes(asset.status);
+
+  return {
+    id: asset.id,
+    filename: asset.filename,
+    mimeType: asset.mimeType,
+    sizeBytes: asset.sizeBytes,
+    status: asset.status,
+    createdAt: asset.createdAt,
+    thumbnailUrl: ready ? await thumbnailUrl(ctx, asset) : null,
+  };
+}
+
+export async function listAssetsPage(
+  ctx: Context,
+  query: { limit: number; offset: number; status?: AssetStatus },
+) {
+  const { rows, total } = await listAssets(ctx.db, query);
+
+  return {
+    items: await Promise.all(
+      rows.map((asset) => presentAssetSummary(ctx, asset)),
+    ),
+    total,
+    limit: query.limit,
+    offset: query.offset,
+  };
 }

@@ -1,5 +1,6 @@
 import { assets, type NewAsset, type Db } from '@dam/db';
-import { and, eq, lt } from 'drizzle-orm';
+import { and, count, desc, eq, lt } from 'drizzle-orm';
+import type { AssetStatus } from '@dam/db';
 
 export async function createAsset(db: Db, values: NewAsset) {
   const [asset] = await db.insert(assets).values(values).returning();
@@ -9,6 +10,30 @@ export async function createAsset(db: Db, values: NewAsset) {
 export async function findAssetById(db: Db, id: string) {
   const [asset] = await db.select().from(assets).where(eq(assets.id, id));
   return asset;
+}
+
+export async function listAssets(
+  db: Db,
+  {
+    limit,
+    offset,
+    status,
+  }: { limit: number; offset: number; status?: AssetStatus },
+) {
+  const where = status ? eq(assets.status, status) : undefined;
+
+  const [rows, [total]] = await Promise.all([
+    db
+      .select()
+      .from(assets)
+      .where(where)
+      .orderBy(desc(assets.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ value: count() }).from(assets).where(where),
+  ]);
+
+  return { rows, total: Number(total?.value ?? 0) };
 }
 
 // Size comes from the finished object in storage, not from what the caller declared
