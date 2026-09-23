@@ -8,8 +8,6 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { publishJob } from '@dam/queue';
-import { randomUUID } from 'node:crypto';
-import { extname } from 'node:path';
 import { config } from '../../config.ts';
 import {
   NotFoundError,
@@ -23,7 +21,11 @@ import {
   findAssetById,
   markUploadComplete,
 } from '../assets/asset.repository.ts';
-import { jobTypeFor } from '../assets/asset.service.ts';
+import {
+  assetKindFor,
+  jobTypeFor,
+  storageKeyFor,
+} from '../../shared/lib/asset-kind.ts';
 import { clearSession, recordedParts } from './upload.session.ts';
 import { planParts } from './utils/part-plan.ts';
 
@@ -31,9 +33,9 @@ export async function startUpload(
   ctx: Context,
   input: { filename: string; mimeType: string; size: number },
 ) {
-  jobTypeFor(input.mimeType); // rejects unsupported types before any S3 call
+  const kind = assetKindFor(input.mimeType); // rejects unsupported types before any S3 call
   const { partSize, partCount } = planParts(input.size);
-  const storageKey = `${randomUUID()}${extname(input.filename)}`;
+  const storageKey = storageKeyFor(kind, input.filename);
 
   const created = await s3.send(
     new CreateMultipartUploadCommand({
@@ -176,9 +178,16 @@ export async function finishUpload(ctx: Context, assetId: string) {
     new HeadObjectCommand({ Bucket: ctx.bucket, Key: asset.storageKey }),
   );
 
-  await markUploadComplete(ctx.db, assetId, head.ContentLength ?? total);
+  const jobType = jobTypeFor(assetKindFor(asset.mimeType));
+
+  await markUploadComplete(
+    ctx.db,
+    assetId,
+    head.ContentLength ?? total,
+    jobType ? 'uploaded' : 'ready',
+  );
   await clearSession(ctx, assetId);
-  await publishJob(ctx.queue, jobTypeFor(asset.mimeType), { assetId });
+  if (jobType) await publishJob(ctx.queue, jobType, { assetId });
 
   return findAssetById(ctx.db, assetId);
 }

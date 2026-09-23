@@ -1,13 +1,13 @@
-import { publishJob, type JobType } from '@dam/queue';
+import { publishJob } from '@dam/queue';
 import type { Asset, AssetStatus } from '@dam/db';
 import { downloadUrl, thumbnailUrl } from '../../shared/lib/storage.ts';
-import { randomUUID } from 'node:crypto';
-import { extname } from 'node:path';
 import type { Context } from '../../shared/lib/context.ts';
+import { NotFoundError } from '../../shared/errors/AppError.ts';
 import {
-  NotFoundError,
-  ValidationError,
-} from '../../shared/errors/AppError.ts';
+  assetKindFor,
+  jobTypeFor,
+  storageKeyFor,
+} from '../../shared/lib/asset-kind.ts';
 import { createAsset, findAssetById, listAssets } from './asset.repository.ts';
 
 export type UploadFile = {
@@ -17,15 +17,10 @@ export type UploadFile = {
   size: number;
 };
 
-export function jobTypeFor(mimeType: string): JobType {
-  if (mimeType.startsWith('image/')) return 'image.process';
-  if (mimeType.startsWith('video/')) return 'video.process';
-  throw new ValidationError('Only image and video files are supported');
-}
-
 export async function uploadAsset(ctx: Context, file: UploadFile) {
-  const jobType = jobTypeFor(file.mimetype);
-  const storageKey = `${randomUUID()}${extname(file.originalname)}`;
+  const kind = assetKindFor(file.mimetype);
+  const jobType = jobTypeFor(kind);
+  const storageKey = storageKeyFor(kind, file.originalname);
 
   await ctx.storage.putObject(ctx.bucket, storageKey, file.buffer, file.size, {
     'Content-Type': file.mimetype,
@@ -36,9 +31,11 @@ export async function uploadAsset(ctx: Context, file: UploadFile) {
     mimeType: file.mimetype,
     sizeBytes: file.size,
     storageKey,
+    // Nothing to process for documents, so they are usable straight away
+    status: jobType ? 'uploaded' : 'ready',
   });
 
-  await publishJob(ctx.queue, jobType, { assetId: asset!.id });
+  if (jobType) await publishJob(ctx.queue, jobType, { assetId: asset.id });
 
   return asset;
 }
