@@ -41,10 +41,11 @@ export async function markUploadComplete(
   db: Db,
   id: string,
   sizeBytes: number,
+  status: AssetStatus,
 ) {
   await db
     .update(assets)
-    .set({ status: 'uploaded', sizeBytes, upload: null, uploadExpiresAt: null })
+    .set({ status, sizeBytes, upload: null, uploadExpiresAt: null })
     .where(eq(assets.id, id));
 }
 
