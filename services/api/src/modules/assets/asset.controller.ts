@@ -1,8 +1,9 @@
 import type { Request, Response } from 'express';
 import { ValidationError } from '../../shared/errors/AppError.ts';
 import type { Context } from '../../shared/lib/context.ts';
-import { getAsset, uploadAsset } from './asset.service.ts';
+import { getAsset, listAssetsPage, uploadAsset } from './asset.service.ts';
 import { z } from 'zod';
+import { listAssetsQuery } from './asset.schema.ts';
 
 export function uploadAssetController(ctx: Context) {
   return async (req: Request, res: Response) => {
@@ -26,5 +27,13 @@ export function getAssetController(ctx: Context) {
     const assetId = z.uuid().parse(req.params.assetId);
 
     res.json(await getAsset(ctx, assetId));
+  };
+}
+
+export function listAssetsController(ctx: Context) {
+  return async (req: Request, res: Response) => {
+    const query = listAssetsQuery.parse(req.query);
+
+    res.json(await listAssetsPage(ctx, query));
   };
 }

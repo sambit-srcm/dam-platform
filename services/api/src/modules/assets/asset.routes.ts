@@ -4,6 +4,7 @@ import { upload } from '../../shared/middlewares/upload.ts';
 import {
   uploadAssetController,
   getAssetController,
+  listAssetsController,
 } from './asset.controller.ts';
 
 export function assetRoutes(ctx: Context) {
@@ -11,5 +12,7 @@ export function assetRoutes(ctx: Context) {
 
   router.post('/', upload.single('file'), uploadAssetController(ctx));
   router.get('/:assetId', getAssetController(ctx));
+  router.get('/', listAssetsController(ctx));
+
   return router;
 }
