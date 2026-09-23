@@ -37,7 +37,6 @@ export function errorHandler(
     return;
   }
 
-  // A request body that failed schema validation is also the caller's problem
   if (error instanceof ZodError) {
     log.warn({ err: error }, 'invalid request body');
     res.status(400).json({
