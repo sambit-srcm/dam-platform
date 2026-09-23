@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { MulterError } from 'multer';
+import { ZodError } from 'zod';
 import { config } from '../../config.ts';
 import { logger } from '../lib/logger.ts';
 import { AppError } from '../errors/AppError.ts';
@@ -28,8 +29,23 @@ export function errorHandler(
       error: {
         code: tooLarge ? 'file_too_large' : 'upload_error',
         message: tooLarge
-          ? `File is larger than the ${config.MAX_UPLOAD_MB} MB limit`
+          ? `File is larger than the ${config.MAX_DIRECT_UPLOAD_MB} MB limit for direct uploads`
           : error.message,
+        requestId: req.id,
+      },
+    });
+    return;
+  }
+
+  // A request body that failed schema validation is also the caller's problem
+  if (error instanceof ZodError) {
+    log.warn({ err: error }, 'invalid request body');
+    res.status(400).json({
+      error: {
+        code: 'validation_error',
+        message: error.issues
+          .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+          .join('; '),
         requestId: req.id,
       },
     });

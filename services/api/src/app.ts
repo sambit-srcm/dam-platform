@@ -5,6 +5,7 @@ import { notFoundHandler } from './shared/middlewares/notFound.ts';
 import { healthRoutes } from './health.ts';
 import { requestLogger } from './shared/middlewares/requestLogger.ts';
 import { assetRoutes } from './modules/assets/asset.routes.ts';
+import { uploadRoutes } from './modules/uploads/upload.routes.ts';
 
 export function createApp(ctx: Context) {
   const app = express();
@@ -16,6 +17,9 @@ export function createApp(ctx: Context) {
   app.use(express.json({ limit: '1mb' }));
 
   app.use('/health', healthRoutes(ctx));
+
+  app.use('/assets/uploads', uploadRoutes(ctx));
+
   app.use('/assets', assetRoutes(ctx));
 
   app.use(notFoundHandler);

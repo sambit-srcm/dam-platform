@@ -3,5 +3,6 @@ export const ASSET_STATUSES = [
   'processing',
   'ready',
   'failed',
+  'uploading',
 ] as const;
 export type AssetStatus = (typeof ASSET_STATUSES)[number];
