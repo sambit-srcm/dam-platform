@@ -23,3 +23,21 @@ export type ListAssetsParams = {
   offset?: number;
   status?: AssetStatus;
 };
+
+
+export type UploadedAsset = {
+  id: string;
+  filename: string;
+  status: AssetStatus;
+};
+
+export type UploadSession = {
+  assetId: string;
+  partSize: number;
+  partCount: number;
+};
+
+export type SignedPart = {
+  partNumber: number;
+  url: string;
+};
