@@ -24,7 +24,6 @@ export type ListAssetsParams = {
   status?: AssetStatus;
 };
 
-
 export type UploadedAsset = {
   id: string;
   filename: string;

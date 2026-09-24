@@ -14,10 +14,9 @@ export async function getAssets(
   return res.data;
 }
 
-
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 
-const PART_URL_BATCH_SIZE = 10; 
+const PART_URL_BATCH_SIZE = 10;
 const PART_CONCURRENCY = 3;
 const PART_ATTEMPTS = 3;
 
@@ -68,7 +67,6 @@ export async function uploadAsset(
         { partNumbers: partNumbers.slice(i, i + PART_URL_BATCH_SIZE) },
       );
 
-     
       const queue = [...data.parts];
       const worker = async () => {
         for (let part = queue.shift(); part; part = queue.shift()) {
@@ -93,12 +91,10 @@ export async function uploadAsset(
     const { data: asset } = await axios.post<UploadedAsset>(`${base}/complete`);
     return asset;
   } catch (error) {
-
     await axios.delete(base).catch(() => undefined);
     throw error;
   }
 }
-
 
 export function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
