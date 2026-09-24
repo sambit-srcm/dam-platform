@@ -28,6 +28,10 @@ const schema = z.object({
   PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
   UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept
 
+  // Signs login tokens; generate with `openssl rand -hex 32`
+  JWT_SECRET: z.string().min(32),
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
+
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),
   MINIO_ROOT_USER: z.string(),

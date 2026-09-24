@@ -20,3 +20,21 @@ export class NotFoundError extends AppError {
     super(404, 'not_found', message);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication required') {
+    super(401, 'unauthorized', message);
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'You do not have access to this') {
+    super(403, 'forbidden', message);
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(409, 'conflict', message);
+  }
+}

@@ -13,6 +13,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../shared/errors/AppError.ts';
+import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
 import type { Context } from '../../shared/lib/context.ts';
 import { s3, s3Public } from '../../shared/lib/s3.ts';
 import {
@@ -26,12 +27,18 @@ import {
   jobTypeFor,
   storageKeyFor,
 } from '../../shared/lib/asset-kind.ts';
-import { clearSession, recordedParts } from './upload.session.ts';
+import {
+  clearSession,
+  recordPart,
+  recordedParts,
+  type UploadedPart,
+} from './upload.session.ts';
 import { planParts } from './utils/part-plan.ts';
 
 export async function startUpload(
   ctx: Context,
   input: { filename: string; mimeType: string; size: number },
+  actor: AuthUser,
 ) {
   const kind = assetKindFor(input.mimeType); // rejects unsupported types before any S3 call
   const { partSize, partCount } = planParts(input.size);
@@ -50,6 +57,7 @@ export async function startUpload(
     mimeType: input.mimeType,
     sizeBytes: input.size,
     storageKey,
+    ownerId: actor.id,
     status: 'uploading',
     upload: { uploadId: created.UploadId!, partSize, partCount },
     uploadExpiresAt: new Date(
@@ -60,9 +68,12 @@ export async function startUpload(
   return { assetId: asset.id, partSize, partCount };
 }
 
-async function activeUpload(ctx: Context, assetId: string) {
+async function activeUpload(ctx: Context, assetId: string, actor: AuthUser) {
   const asset = await findAssetById(ctx.db, assetId);
-  if (!asset) throw new NotFoundError('Upload not found');
+  // Someone else's upload looks the same as a missing one
+  if (!asset || !canAccess(actor, asset)) {
+    throw new NotFoundError('Upload not found');
+  }
   if (asset.status !== 'uploading' || !asset.upload) {
     throw new ValidationError('This upload is no longer in progress');
   }
@@ -73,8 +84,9 @@ export async function signParts(
   ctx: Context,
   assetId: string,
   partNumbers: number[],
+  actor: AuthUser,
 ) {
-  const asset = await activeUpload(ctx, assetId);
+  const asset = await activeUpload(ctx, assetId, actor);
   const { partCount } = asset.upload!;
 
   if (partNumbers.some((partNumber) => partNumber > partCount)) {
@@ -100,8 +112,12 @@ export async function signParts(
   );
 }
 
-export async function uploadStatus(ctx: Context, assetId: string) {
-  const asset = await activeUpload(ctx, assetId);
+export async function uploadStatus(
+  ctx: Context,
+  assetId: string,
+  actor: AuthUser,
+) {
+  const asset = await activeUpload(ctx, assetId, actor);
   const listed = await s3.send(
     new ListPartsCommand({
       Bucket: ctx.bucket,
@@ -126,8 +142,12 @@ export async function uploadStatus(ctx: Context, assetId: string) {
   };
 }
 
-export async function finishUpload(ctx: Context, assetId: string) {
-  const asset = await activeUpload(ctx, assetId);
+export async function finishUpload(
+  ctx: Context,
+  assetId: string,
+  actor: AuthUser,
+) {
+  const asset = await activeUpload(ctx, assetId, actor);
   const { uploadId, partSize, partCount } = asset.upload!;
 
   const listed = await s3.send(
@@ -192,8 +212,12 @@ export async function finishUpload(ctx: Context, assetId: string) {
   return findAssetById(ctx.db, assetId);
 }
 
-export async function abortUpload(ctx: Context, assetId: string) {
-  const asset = await activeUpload(ctx, assetId);
+export async function abortUpload(
+  ctx: Context,
+  assetId: string,
+  actor: AuthUser,
+) {
+  const asset = await activeUpload(ctx, assetId, actor);
   await s3.send(
     new AbortMultipartUploadCommand({
       Bucket: ctx.bucket,
@@ -203,4 +227,15 @@ export async function abortUpload(ctx: Context, assetId: string) {
   );
   await failAsset(ctx.db, assetId, 'cancelled_by_user');
   await clearSession(ctx, assetId);
+}
+
+// Progress bookkeeping only, but still limited to the upload's owner
+export async function recordUploadedPart(
+  ctx: Context,
+  assetId: string,
+  part: UploadedPart,
+  actor: AuthUser,
+) {
+  await activeUpload(ctx, assetId, actor);
+  await recordPart(ctx, assetId, part);
 }
