@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { http } from '../../lib/http';
 import type {
   AssetListResponse,
   ListAssetsParams,
@@ -10,7 +11,7 @@ import type {
 export async function getAssets(
   params: ListAssetsParams = {},
 ): Promise<AssetListResponse> {
-  const res = await axios.get<AssetListResponse>('/api/assets', { params });
+  const res = await http.get<AssetListResponse>('/assets', { params });
   return res.data;
 }
 
@@ -45,12 +46,13 @@ export async function uploadAsset(
   file: File,
   onProgress?: (percent: number) => void,
 ): Promise<UploadedAsset> {
-  const { data: session } = await axios.post<UploadSession>(
-    '/api/assets/uploads',
-    { filename: file.name, mimeType: file.type, size: file.size },
-  );
+  const { data: session } = await http.post<UploadSession>('/assets/uploads', {
+    filename: file.name,
+    mimeType: file.type,
+    size: file.size,
+  });
   const { assetId, partSize, partCount } = session;
-  const base = `/api/assets/uploads/${assetId}`;
+  const base = `/assets/uploads/${assetId}`;
 
   const loadedByPart = new Array<number>(partCount + 1).fill(0);
   const report = () => {
@@ -62,7 +64,7 @@ export async function uploadAsset(
     const partNumbers = Array.from({ length: partCount }, (_, i) => i + 1);
 
     for (let i = 0; i < partNumbers.length; i += PART_URL_BATCH_SIZE) {
-      const { data } = await axios.post<{ parts: SignedPart[] }>(
+      const { data } = await http.post<{ parts: SignedPart[] }>(
         `${base}/parts`,
         { partNumbers: partNumbers.slice(i, i + PART_URL_BATCH_SIZE) },
       );
@@ -88,17 +90,10 @@ export async function uploadAsset(
       );
     }
 
-    const { data: asset } = await axios.post<UploadedAsset>(`${base}/complete`);
+    const { data: asset } = await http.post<UploadedAsset>(`${base}/complete`);
     return asset;
   } catch (error) {
-    await axios.delete(base).catch(() => undefined);
+    await http.delete(base).catch(() => undefined);
     throw error;
   }
-}
-
-export function getErrorMessage(error: unknown) {
-  if (axios.isAxiosError(error)) {
-    return error.response?.data?.error?.message ?? error.message;
-  }
-  return error instanceof Error ? error.message : 'Something went wrong';
 }

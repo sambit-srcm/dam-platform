@@ -1,10 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
-import {
-  MAX_UPLOAD_BYTES,
-  getErrorMessage,
-  uploadAsset,
-} from '../features/assets/api';
+import { MAX_UPLOAD_BYTES, uploadAsset } from '../features/assets/api';
+import { getErrorMessage } from '../lib/http';
 
 const ACCEPT = 'image/*,video/*,application/pdf';
 
