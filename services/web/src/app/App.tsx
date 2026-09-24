@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import { getAssets } from '../features/assets/api';
-import type { Asset } from '../features/assets/types';
+import { NavLink, Route, Routes } from 'react-router';
+import { GalleryPage } from '../pages/GalleryPage';
+import { UploadPage } from '../pages/UploadPage';
 
 type Health = 'checking' | 'connected' | 'unavailable';
 
@@ -11,14 +12,13 @@ const HEALTH_STYLES: Record<Health, string> = {
   unavailable: 'bg-red-100 text-red-700',
 };
 
-function formatSize(bytes: number) {
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+const navClass = ({ isActive }: { isActive: boolean }) =>
+  `text-sm font-medium transition ${
+    isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-900'
+  }`;
 
 export function App() {
   const [health, setHealth] = useState<Health>('checking');
-  const [assets, setAssets] = useState<Asset[]>([]);
 
   useEffect(() => {
     axios
@@ -27,19 +27,21 @@ export function App() {
       .catch(() => setHealth('unavailable'));
   }, []);
 
-  useEffect(() => {
-    const loadAssets = async () => {
-      const data = await getAssets({ limit: 24, status: 'ready' });
-      setAssets(data.items);
-    };
-    loadAssets();
-  }, []);
-
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <h1 className="text-lg font-semibold">DAM platform</h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-lg font-semibold">DAM platform</h1>
+            <nav className="flex gap-4">
+              <NavLink to="/" end className={navClass}>
+                Gallery
+              </NavLink>
+              <NavLink to="/upload" className={navClass}>
+                Upload
+              </NavLink>
+            </nav>
+          </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${HEALTH_STYLES[health]}`}
           >
@@ -49,41 +51,10 @@ export function App() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <h2 className="mb-4 text-sm font-medium text-gray-500">
-          Assets ({assets.length})
-        </h2>
-
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {assets.map((asset) => (
-            <li
-              key={asset.id}
-              className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md"
-            >
-              <div className="flex aspect-square items-center justify-center bg-gray-100">
-                {asset.thumbnailUrl ? (
-                  <img
-                    src={asset.thumbnailUrl}
-                    alt={asset.filename}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-xs text-gray-400">No preview</span>
-                )}
-              </div>
-              <div className="p-3">
-                <p
-                  className="truncate text-sm font-medium"
-                  title={asset.filename}
-                >
-                  {asset.filename}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  {formatSize(asset.sizeBytes)}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <Routes>
+          <Route path="/" element={<GalleryPage />} />
+          <Route path="/upload" element={<UploadPage />} />
+        </Routes>
       </main>
     </div>
   );
