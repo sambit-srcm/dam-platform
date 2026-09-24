@@ -5,6 +5,8 @@ import { notFoundHandler } from './shared/middlewares/notFound.ts';
 import { healthRoutes } from './health.ts';
 import { requestLogger } from './shared/middlewares/requestLogger.ts';
 import { assetRoutes } from './modules/assets/asset.routes.ts';
+import { authRoutes } from './modules/auth/auth.routes.ts';
+import { requireAuth } from './shared/middlewares/requireAuth.ts';
 import { uploadRoutes } from './modules/uploads/upload.routes.ts';
 
 export function createApp(ctx: Context) {
@@ -16,10 +18,14 @@ export function createApp(ctx: Context) {
   app.use(requestLogger);
   app.use(express.json({ limit: '1mb' }));
 
+  // Public: probes and nginx need health without a login, and people need /auth to get one
   app.use('/health', healthRoutes(ctx));
+  app.use('/auth', authRoutes(ctx));
+
+  // Everything mounted below this line needs a valid token
+  app.use(requireAuth);
 
   app.use('/assets/uploads', uploadRoutes(ctx));
-
   app.use('/assets', assetRoutes(ctx));
 
   app.use(notFoundHandler);
