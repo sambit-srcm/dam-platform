@@ -18,9 +18,18 @@ export async function listAssets(
     limit,
     offset,
     status,
-  }: { limit: number; offset: number; status?: AssetStatus },
+    ownerId,
+  }: {
+    limit: number;
+    offset: number;
+    status?: AssetStatus;
+    ownerId: string;
+  },
 ) {
-  const where = status ? eq(assets.status, status) : undefined;
+  const where = and(
+    status ? eq(assets.status, status) : undefined,
+    eq(assets.ownerId, ownerId),
+  );
 
   const [rows, [total]] = await Promise.all([
     db

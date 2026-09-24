@@ -4,6 +4,7 @@ import type { Context } from '../../shared/lib/context.ts';
 import { getAsset, listAssetsPage, uploadAsset } from './asset.service.ts';
 import { z } from 'zod';
 import { listAssetsQuery } from './asset.schema.ts';
+import { currentUser } from '../../shared/middlewares/requireAuth.ts';
 
 export function uploadAssetController(ctx: Context) {
   return async (req: Request, res: Response) => {
@@ -12,7 +13,7 @@ export function uploadAssetController(ctx: Context) {
       throw new ValidationError('A file is required in the "file" field');
     }
 
-    const asset = await uploadAsset(ctx, file);
+    const asset = await uploadAsset(ctx, file, currentUser(req));
 
     req.log.info(
       { assetId: asset.id, storageKey: asset.storageKey },
@@ -26,7 +27,7 @@ export function getAssetController(ctx: Context) {
   return async (req: Request, res: Response) => {
     const assetId = z.uuid().parse(req.params.assetId);
 
-    res.json(await getAsset(ctx, assetId));
+    res.json(await getAsset(ctx, assetId, currentUser(req)));
   };
 }
 
@@ -34,6 +35,6 @@ export function listAssetsController(ctx: Context) {
   return async (req: Request, res: Response) => {
     const query = listAssetsQuery.parse(req.query);
 
-    res.json(await listAssetsPage(ctx, query));
+    res.json(await listAssetsPage(ctx, query, currentUser(req)));
   };
 }

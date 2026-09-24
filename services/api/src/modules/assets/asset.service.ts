@@ -3,6 +3,7 @@ import type { Asset, AssetStatus } from '@dam/db';
 import { downloadUrl, thumbnailUrl } from '../../shared/lib/storage.ts';
 import type { Context } from '../../shared/lib/context.ts';
 import { NotFoundError } from '../../shared/errors/AppError.ts';
+import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
 import {
   assetKindFor,
   jobTypeFor,
@@ -17,7 +18,11 @@ export type UploadFile = {
   size: number;
 };
 
-export async function uploadAsset(ctx: Context, file: UploadFile) {
+export async function uploadAsset(
+  ctx: Context,
+  file: UploadFile,
+  actor: AuthUser,
+) {
   const kind = assetKindFor(file.mimetype);
   const jobType = jobTypeFor(kind);
   const storageKey = storageKeyFor(kind, file.originalname);
@@ -31,6 +36,7 @@ export async function uploadAsset(ctx: Context, file: UploadFile) {
     mimeType: file.mimetype,
     sizeBytes: file.size,
     storageKey,
+    ownerId: actor.id,
     // Nothing to process for documents, so they are usable straight away
     status: jobType ? 'uploaded' : 'ready',
   });
@@ -48,6 +54,7 @@ export async function presentAsset(ctx: Context, asset: Asset) {
 
   return {
     id: asset.id,
+    ownerId: asset.ownerId,
     filename: asset.filename,
     mimeType: asset.mimeType,
     sizeBytes: asset.sizeBytes,
@@ -60,9 +67,12 @@ export async function presentAsset(ctx: Context, asset: Asset) {
   };
 }
 
-export async function getAsset(ctx: Context, id: string) {
+export async function getAsset(ctx: Context, id: string, actor: AuthUser) {
   const asset = await findAssetById(ctx.db, id);
-  if (!asset) throw new NotFoundError('Asset not found');
+  // Someone else's asset looks the same as a missing one, so ids can't be probed
+  if (!asset || !canAccess(actor, asset)) {
+    throw new NotFoundError('Asset not found');
+  }
 
   return presentAsset(ctx, asset);
 }
@@ -85,8 +95,12 @@ export async function presentAssetSummary(ctx: Context, asset: Asset) {
 export async function listAssetsPage(
   ctx: Context,
   query: { limit: number; offset: number; status?: AssetStatus },
+  actor: AuthUser,
 ) {
-  const { rows, total } = await listAssets(ctx.db, query);
+  const { rows, total } = await listAssets(ctx.db, {
+    ...query,
+    ownerId: actor.id,
+  });
 
   return {
     items: await Promise.all(
