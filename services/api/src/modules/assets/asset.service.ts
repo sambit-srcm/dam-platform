@@ -1,15 +1,9 @@
-import { publishJob } from '@dam/queue';
 import type { Asset, AssetStatus } from '@dam/db';
 import { downloadUrl, thumbnailUrl } from '../../shared/lib/storage.ts';
 import type { Context } from '../../shared/lib/context.ts';
 import { NotFoundError } from '../../shared/errors/AppError.ts';
 import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
-import {
-  assetKindFor,
-  jobTypeFor,
-  storageKeyFor,
-} from '../../shared/lib/asset-kind.ts';
-import { createAsset, findAssetById, listAssets } from './asset.repository.ts';
+import { findAssetById, listAssets } from './asset.repository.ts';
 
 export type UploadFile = {
   buffer: Buffer;
@@ -17,34 +11,6 @@ export type UploadFile = {
   mimetype: string;
   size: number;
 };
-
-export async function uploadAsset(
-  ctx: Context,
-  file: UploadFile,
-  actor: AuthUser,
-) {
-  const kind = assetKindFor(file.mimetype);
-  const jobType = jobTypeFor(kind);
-  const storageKey = storageKeyFor(kind, file.originalname);
-
-  await ctx.storage.putObject(ctx.bucket, storageKey, file.buffer, file.size, {
-    'Content-Type': file.mimetype,
-  });
-
-  const asset = await createAsset(ctx.db, {
-    filename: file.originalname,
-    mimeType: file.mimetype,
-    sizeBytes: file.size,
-    storageKey,
-    ownerId: actor.id,
-    // Nothing to process for documents, so they are usable straight away
-    status: jobType ? 'uploaded' : 'ready',
-  });
-
-  if (jobType) await publishJob(ctx.queue, jobType, { assetId: asset.id });
-
-  return asset;
-}
 
 // The statuses where a finished object actually exists in storage
 const HAS_OBJECT: AssetStatus[] = ['uploaded', 'processing', 'ready'];

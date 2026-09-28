@@ -8,10 +8,21 @@ import { clearSession } from './upload.session.ts';
 
 // Throws away uploads that were started but never finished, so the parts
 // already in storage stop being paid for and the row stops looking pending.
-export async function sweepExpiredUploads(ctx: Context) {
-  const expired = await findExpiredUploads(ctx.db, new Date());
-  let swept = 0;
 
+export async function sweepExpiredUploads(ctx: Context) {
+  let swept = 0;
+  const lockKey = 'lock:upload-cleanup';
+  const lockTtlMs = config.UPLOAD_CLEANUP_INTERVAL_SECONDS * 1000 - 1000;
+
+  const acquired = await ctx.redis.set(lockKey, '1', {
+    NX: true,
+    PX: lockTtlMs,
+  });
+  if (!acquired) {
+    logger.debug('upload cleanup sweep already running elsewhere, skipping');
+    return 0;
+  }
+  const expired = await findExpiredUploads(ctx.db, new Date());
   for (const asset of expired) {
     const log = logger.child({ assetId: asset.id });
 

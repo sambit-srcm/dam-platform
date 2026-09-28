@@ -11,6 +11,7 @@ const schema = z.object({
   DATABASE_URL: z.string(),
   REDIS_URL: z.string(),
   AMQP_URL: z.string(),
+  DB_POOL_MAX: z.coerce.number().default(10),
 
   // How long a single readiness check may take before it counts as down
   HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),
@@ -22,8 +23,6 @@ const schema = z.object({
 
   // Ceiling for a resumable multipart upload
   MAX_UPLOAD_GB: z.coerce.number().default(5),
-  // Ceiling for the single-request upload, which is buffered in memory
-  MAX_DIRECT_UPLOAD_MB: z.coerce.number().default(25),
   UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
   PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
   UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept

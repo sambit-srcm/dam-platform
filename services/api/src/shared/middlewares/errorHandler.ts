@@ -1,7 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { MulterError } from 'multer';
 import { ZodError } from 'zod';
-import { config } from '../../config.ts';
 import { logger } from '../lib/logger.ts';
 import { AppError } from '../errors/AppError.ts';
 
@@ -18,22 +16,6 @@ export function errorHandler(
   if (res.headersSent) {
     log.error({ err: error }, 'error after the response had started');
     res.destroy();
-    return;
-  }
-
-  // Rejected uploads are the caller's problem, not a server fault
-  if (error instanceof MulterError) {
-    const tooLarge = error.code === 'LIMIT_FILE_SIZE';
-    log.warn({ err: error, code: error.code }, 'upload rejected');
-    res.status(tooLarge ? 413 : 400).json({
-      error: {
-        code: tooLarge ? 'file_too_large' : 'upload_error',
-        message: tooLarge
-          ? `File is larger than the ${config.MAX_DIRECT_UPLOAD_MB} MB limit for direct uploads`
-          : error.message,
-        requestId: req.id,
-      },
-    });
     return;
   }
 

@@ -6,8 +6,15 @@ import { killAllChildren } from './lib/exec.ts';
 import { logger } from './logger.ts';
 import { processVideo } from './processVideo.ts';
 import { markAssetFailed } from './repository.ts';
+import { writeFileSync } from 'node:fs';
 
 const ctx = await createContext();
+function touchHeartbeat() {
+  writeFileSync(config.HEARTBEAT_FILE, Date.now().toString());
+}
+touchHeartbeat();
+const heartbeatTimer = setInterval(touchHeartbeat, 30_000);
+heartbeatTimer.unref();
 
 // The job running right now, so shutdown can wait for it to clean up after itself
 let inFlight: Promise<void> = Promise.resolve();
@@ -19,6 +26,7 @@ const stopConsuming = await consumeJobs(
     const job = processVideo(ctx, assetId);
     inFlight = job.catch(() => undefined);
     await job;
+    touchHeartbeat();
   },
   {
     prefetch: config.VIDEO_PREFETCH,
@@ -64,7 +72,13 @@ async function shutdown(signal: string) {
 
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
-
+ctx.queue.connection.on('close', () => {
+  logger.error('rabbitmq connection closed');
+  if (!shuttingDown) process.exit(1);
+});
+ctx.queue.connection.on('error', (error) => {
+  logger.error({ err: error }, 'rabbitmq connection error');
+});
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'unhandled rejection');
   // The interrupted job can't report back once the channel is closed, which is expected
