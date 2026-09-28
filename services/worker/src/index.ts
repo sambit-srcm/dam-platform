@@ -4,14 +4,22 @@ import { config } from './config.ts';
 import { createContext } from './context.ts';
 import { logger } from './logger.ts';
 import { processImage } from './processImage.ts';
+import { writeFileSync } from 'node:fs';
 
 const ctx = await createContext();
+function touchHeartbeat() {
+  writeFileSync(config.HEARTBEAT_FILE, Date.now().toString());
+}
+touchHeartbeat();
+const heartbeatTimer = setInterval(touchHeartbeat, 30_000);
+heartbeatTimer.unref();
 
 const stopConsuming = await consumeJobs(
   ctx.queue,
   'image.process',
   async ({ assetId }) => {
     await processImage(ctx, assetId);
+    touchHeartbeat();
   },
   {
     prefetch: config.WORKER_PREFETCH,
@@ -41,7 +49,7 @@ async function shutdown(signal: string) {
   shuttingDown = true;
 
   logger.info({ signal }, 'shutting down');
-  // Stops taking new jobs; anything unacknowledged goes back on the queue
+
   await stopConsuming();
   await ctx.close();
   process.exit(0);
@@ -49,6 +57,13 @@ async function shutdown(signal: string) {
 
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
+ctx.queue.connection.on('close', () => {
+  logger.error('rabbitmq connection closed');
+  if (!shuttingDown) process.exit(1);
+});
+ctx.queue.connection.on('error', (error) => {
+  logger.error({ err: error }, 'rabbitmq connection error');
+});
 
 process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'unhandled rejection');

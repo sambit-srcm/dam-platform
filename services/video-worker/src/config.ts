@@ -25,7 +25,7 @@ const schema = z.object({
   FFMPEG_THREADS: z.coerce.number().default(2),
   FFMPEG_PATH: z.string().default('ffmpeg'),
   FFPROBE_PATH: z.string().default('ffprobe'),
-
+  HEARTBEAT_FILE: z.string().default('/tmp/worker-alive'),
   // Files beyond these limits are rejected instead of being transcoded
   MAX_DURATION_SECONDS: z.coerce.number().default(4 * 60 * 60),
   MAX_DIMENSION_PX: z.coerce.number().default(8192),

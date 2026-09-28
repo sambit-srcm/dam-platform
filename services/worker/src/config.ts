@@ -17,7 +17,7 @@ const schema = z.object({
   MINIO_ROOT_USER: z.string(),
   MINIO_ROOT_PASSWORD: z.string(),
   MINIO_BUCKET: z.string(),
-
+  HEARTBEAT_FILE: z.string().default('/tmp/worker-alive'),
   // Width of the generated thumbnail, in pixels
   THUMBNAIL_WIDTH: z.coerce.number().default(400),
   // How many jobs this worker takes at a time
