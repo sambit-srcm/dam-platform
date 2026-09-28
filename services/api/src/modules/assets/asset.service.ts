@@ -18,34 +18,6 @@ export type UploadFile = {
   size: number;
 };
 
-export async function uploadAsset(
-  ctx: Context,
-  file: UploadFile,
-  actor: AuthUser,
-) {
-  const kind = assetKindFor(file.mimetype);
-  const jobType = jobTypeFor(kind);
-  const storageKey = storageKeyFor(kind, file.originalname);
-
-  await ctx.storage.putObject(ctx.bucket, storageKey, file.buffer, file.size, {
-    'Content-Type': file.mimetype,
-  });
-
-  const asset = await createAsset(ctx.db, {
-    filename: file.originalname,
-    mimeType: file.mimetype,
-    sizeBytes: file.size,
-    storageKey,
-    ownerId: actor.id,
-    // Nothing to process for documents, so they are usable straight away
-    status: jobType ? 'uploaded' : 'ready',
-  });
-
-  if (jobType) await publishJob(ctx.queue, jobType, { assetId: asset.id });
-
-  return asset;
-}
-
 // The statuses where a finished object actually exists in storage
 const HAS_OBJECT: AssetStatus[] = ['uploaded', 'processing', 'ready'];
 
