@@ -1,15 +1,9 @@
-import { publishJob } from '@dam/queue';
 import type { Asset, AssetStatus } from '@dam/db';
 import { downloadUrl, thumbnailUrl } from '../../shared/lib/storage.ts';
 import type { Context } from '../../shared/lib/context.ts';
 import { NotFoundError } from '../../shared/errors/AppError.ts';
 import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
-import {
-  assetKindFor,
-  jobTypeFor,
-  storageKeyFor,
-} from '../../shared/lib/asset-kind.ts';
-import { createAsset, findAssetById, listAssets } from './asset.repository.ts';
+import { findAssetById, listAssets } from './asset.repository.ts';
 
 export type UploadFile = {
   buffer: Buffer;

@@ -1,6 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
-import { config } from '../../config.ts';
 import { logger } from '../lib/logger.ts';
 import { AppError } from '../errors/AppError.ts';
 
