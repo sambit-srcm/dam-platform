@@ -8,6 +8,8 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
 
   DATABASE_URL: z.string(),
+  DB_POOL_MAX: z.coerce.number().default(10),
+
   AMQP_URL: z.string(),
 
   MINIO_ENDPOINT: z.string(),

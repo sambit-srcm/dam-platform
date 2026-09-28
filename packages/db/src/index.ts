@@ -2,9 +2,12 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
 
-export function createDb(connectionString: string) {
+export function createDb(
+  connectionString: string,
+  options?: { maxConnections?: number },
+) {
   return drizzle({
-    connection: { connectionString },
+    connection: { connectionString, max: options?.maxConnections },
     schema,
     casing: 'snake_case',
   });

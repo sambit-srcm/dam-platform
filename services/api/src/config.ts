@@ -11,6 +11,7 @@ const schema = z.object({
   DATABASE_URL: z.string(),
   REDIS_URL: z.string(),
   AMQP_URL: z.string(),
+  DB_POOL_MAX: z.coerce.number().default(10),
 
   // How long a single readiness check may take before it counts as down
   HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),

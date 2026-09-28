@@ -13,7 +13,9 @@ export type Context = {
 };
 
 export async function createContext(): Promise<Context> {
-  const db = createDb(config.DATABASE_URL);
+  const db = createDb(config.DATABASE_URL, {
+    maxConnections: config.DB_POOL_MAX,
+  });
   const queue = await connectJobQueue(config.AMQP_URL);
 
   const storage = new MinioClient({
