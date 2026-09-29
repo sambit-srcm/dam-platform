@@ -59,6 +59,8 @@ export const assets = pgTable(
     // Set by the video worker; empty for images and documents
     metadata: jsonb().$type<VideoMetadata>(),
     uploadExpiresAt: timestamp({ withTimezone: true }),
+    //column for handling download counts
+    downloadCount: integer().notNull().default(0),
 
     failureReason: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
