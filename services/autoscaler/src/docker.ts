@@ -45,6 +45,7 @@ function callDockerApi(method: string, path: string, bodyToSend?: unknown) {
 }
 
 // Swarm always puts the stack name in front of a service's name,
+// e.g. the "thumbnail-worker" service becomes "dam-platform_thumbnail-worker"
 export function fullServiceName(shortName: string) {
   return `${config.STACK_NAME}_${shortName}`;
 }
