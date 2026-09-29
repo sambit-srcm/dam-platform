@@ -1,5 +1,6 @@
 import {
   assets,
+  mergeTags,
   renditions,
   type Db,
   type NewRendition,
@@ -38,9 +39,11 @@ export async function completeVideoAsset(
   assetId: string,
   {
     metadata,
+    tags,
     outputs,
   }: {
     metadata: VideoMetadata;
+    tags: string[];
     outputs: Omit<NewRendition, 'assetId'>[];
   },
 ) {
@@ -73,7 +76,12 @@ export async function completeVideoAsset(
 
     await tx
       .update(assets)
-      .set({ status: 'ready', metadata, failureReason: null })
+      .set({
+        status: 'ready',
+        metadata,
+        tags: mergeTags(tags),
+        failureReason: null,
+      })
       .where(eq(assets.id, assetId));
   });
 }

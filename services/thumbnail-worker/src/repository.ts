@@ -1,4 +1,4 @@
-import { assets, type Db } from '@dam/db';
+import { assets, mergeTags, type Db, type ImageMetadata } from '@dam/db';
 import { eq } from 'drizzle-orm';
 
 export async function findAssetById(db: Db, id: string) {
@@ -13,10 +13,18 @@ export async function markAssetProcessing(db: Db, id: string) {
     .where(eq(assets.id, id));
 }
 
-export async function markAssetReady(db: Db, id: string, thumbnailKey: string) {
+export async function markAssetReady(
+  db: Db,
+  id: string,
+  {
+    thumbnailKey,
+    metadata,
+    tags,
+  }: { thumbnailKey: string; metadata: ImageMetadata; tags: string[] },
+) {
   await db
     .update(assets)
-    .set({ status: 'ready', thumbnailKey })
+    .set({ status: 'ready', thumbnailKey, metadata, tags: mergeTags(tags) })
     .where(eq(assets.id, id));
 }
 export async function markAssetFailed(db: Db, id: string) {
