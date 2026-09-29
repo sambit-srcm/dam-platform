@@ -8,10 +8,6 @@ export const DEAD_LETTER_EXCHANGE = 'dam.jobs.dlx';
 export const DELIVERY_LIMIT = 5;
 
 export const queues = {
-  'image.process': {
-    queue: 'dam.image-processing',
-    deadLetterQueue: 'dam.image-processing.dlq',
-  },
   'video.process': {
     queue: 'dam.video-processing',
     deadLetterQueue: 'dam.video-processing.dlq',
