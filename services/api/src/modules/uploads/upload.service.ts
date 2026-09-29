@@ -22,9 +22,10 @@ import {
   findAssetById,
   markUploadComplete,
 } from '../assets/asset.repository.ts';
+import { presentAsset } from '../assets/asset.service.ts';
 import {
   assetKindFor,
-  jobTypeFor,
+  jobTypesFor,
   storageKeyFor,
 } from '../../shared/lib/asset-kind.ts';
 import {
@@ -34,6 +35,7 @@ import {
   type UploadedPart,
 } from './upload.session.ts';
 import { planParts } from './utils/part-plan.ts';
+import { logger } from '../../shared/lib/logger.ts';
 
 export async function startUpload(
   ctx: Context,
@@ -198,18 +200,30 @@ export async function finishUpload(
     new HeadObjectCommand({ Bucket: ctx.bucket, Key: asset.storageKey }),
   );
 
-  const jobType = jobTypeFor(assetKindFor(asset.mimeType));
+  const jobTypes = jobTypesFor(assetKindFor(asset.mimeType));
 
   await markUploadComplete(
     ctx.db,
     assetId,
     head.ContentLength ?? total,
-    jobType ? 'uploaded' : 'ready',
+    jobTypes.length > 0 ? 'uploaded' : 'ready',
   );
   await clearSession(ctx, assetId);
-  if (jobType) await publishJob(ctx.queue, jobType, { assetId });
 
-  return findAssetById(ctx.db, assetId);
+  for (const [index, jobType] of jobTypes.entries()) {
+    try {
+      await publishJob(ctx.queue, jobType, { assetId });
+    } catch (error) {
+      // The first job finishes the asset; later ones (a video poster) are optional
+      if (index === 0) throw error;
+      logger.warn({ err: error, assetId, jobType }, 'failed to queue job');
+    }
+  }
+
+  const finished = await findAssetById(ctx.db, assetId);
+  if (!finished) throw new NotFoundError('Upload not found');
+
+  return presentAsset(ctx, finished);
 }
 
 export async function abortUpload(
