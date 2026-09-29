@@ -12,15 +12,15 @@ const schema = z.object({
   RABBITMQ_PASSWORD: z.string(),
 
   DOCKER_SOCKET_PATH: z.string().default('/var/run/docker.sock'),
-  // Prefix Swarm puts in front of every service name, e.g. "dam-platform_worker"
+  // Prefix Swarm puts in front of every service name, e.g. "dam-platform_thumbnail-worker"
   STACK_NAME: z.string().default('dam-platform'),
 
   POLL_INTERVAL_MS: z.coerce.number().default(30_000),
   // Consecutive empty polls required before scaling down, so a brief lull doesn't cause flapping
   SCALE_DOWN_COOLDOWN_POLLS: z.coerce.number().default(3),
 
-  IMAGE_QUEUE: z.string().default('dam.image-processing'),
-  IMAGE_SERVICE: z.string().default('worker'),
+  IMAGE_QUEUE: z.string().default('dam.thumbnail-generation'),
+  IMAGE_SERVICE: z.string().default('thumbnail-worker'),
   IMAGE_MIN_REPLICAS: z.coerce.number().default(1),
   IMAGE_MAX_REPLICAS: z.coerce.number().default(6),
   // Add one replica for every this-many messages waiting in the queue

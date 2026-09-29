@@ -1,5 +1,5 @@
 {
-  "name": "@dam/worker",
+  "name": "@dam/thumbnail-worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",

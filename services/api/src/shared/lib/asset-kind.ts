@@ -13,10 +13,10 @@ const FOLDERS: Record<AssetKind, string> = {
 };
 
 // Documents need no processing, so they have no job
-const JOBS: Record<AssetKind, JobType | null> = {
-  image: 'image.process',
-  video: 'video.process',
-  document: null,
+const JOBS: Record<AssetKind, JobType[]> = {
+  image: ['thumbnail.generate'],
+  video: ['video.process', 'thumbnail.generate'],
+  document: [],
 };
 
 export const DOCUMENT_MIME_TYPES = ['application/pdf'];
@@ -28,7 +28,7 @@ export function assetKindFor(mimeType: string): AssetKind {
   throw new ValidationError('Only image, video and PDF files are supported');
 }
 
-export function jobTypeFor(kind: AssetKind): JobType | null {
+export function jobTypesFor(kind: AssetKind): JobType[] {
   return JOBS[kind];
 }
 

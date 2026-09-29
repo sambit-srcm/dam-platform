@@ -1,9 +1,10 @@
-import { markAssetFailed } from './repository.ts';
+import { findAssetById, markAssetFailed } from './repository.ts';
 import { consumeJobs } from '@dam/queue';
 import { config } from './config.ts';
 import { createContext } from './context.ts';
 import { logger } from './logger.ts';
-import { processImage } from './processImage.ts';
+import { killAllChildren } from './lib/exec.ts';
+import { processThumbnail } from './processThumbnail.ts';
 import { writeFileSync } from 'node:fs';
 
 const ctx = await createContext();
@@ -14,11 +15,16 @@ touchHeartbeat();
 const heartbeatTimer = setInterval(touchHeartbeat, 30_000);
 heartbeatTimer.unref();
 
+// The job running right now, so shutdown can wait for it to clean up after itself
+let inFlight: Promise<void> = Promise.resolve();
+
 const stopConsuming = await consumeJobs(
   ctx.queue,
-  'image.process',
+  'thumbnail.generate',
   async ({ assetId }) => {
-    await processImage(ctx, assetId);
+    const job = processThumbnail(ctx, assetId);
+    inFlight = job.catch(() => undefined);
+    await job;
     touchHeartbeat();
   },
   {
@@ -29,9 +35,13 @@ const stopConsuming = await consumeJobs(
         'job failed',
       );
 
-      // Out of retries: record it on the asset instead of leaving it at processing
+      // Out of retries: an image is stuck at processing, so mark it failed.
+      // A video keeps the status the video worker gave it, poster or not.
       if (!willRetry && payload) {
-        await markAssetFailed(ctx.db, payload.assetId);
+        const asset = await findAssetById(ctx.db, payload.assetId);
+        if (asset?.mimeType.startsWith('image/')) {
+          await markAssetFailed(ctx.db, payload.assetId);
+        }
       }
     },
   },
@@ -39,7 +49,7 @@ const stopConsuming = await consumeJobs(
 
 logger.info(
   { prefetch: config.WORKER_PREFETCH, thumbnailWidth: config.THUMBNAIL_WIDTH },
-  'image worker started',
+  'thumbnail worker started',
 );
 
 let shuttingDown = false;
@@ -50,7 +60,11 @@ async function shutdown(signal: string) {
 
   logger.info({ signal }, 'shutting down');
 
+  // Stops taking new jobs; the running one goes back on the queue unacknowledged
   await stopConsuming();
+  killAllChildren();
+  // Killing ffmpeg makes the job fail, and its temp folder is removed as it unwinds
+  await inFlight;
   await ctx.close();
   process.exit(0);
 }
