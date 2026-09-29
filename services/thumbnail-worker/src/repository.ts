@@ -22,3 +22,11 @@ export async function markAssetReady(db: Db, id: string, thumbnailKey: string) {
 export async function markAssetFailed(db: Db, id: string) {
   await db.update(assets).set({ status: 'failed' }).where(eq(assets.id, id));
 }
+
+export async function updateAssetThumbnail(
+  db: Db,
+  id: string,
+  thumbnailKey: string,
+) {
+  await db.update(assets).set({ thumbnailKey }).where(eq(assets.id, id));
+}

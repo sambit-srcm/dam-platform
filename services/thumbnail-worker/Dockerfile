@@ -15,6 +15,7 @@ FROM node:25-alpine AS runtime
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /repo
 COPY --from=build --chown=app:app /repo /repo
+RUN apk add --no-cache ffmpeg
 USER app
 WORKDIR /repo/services/thumbnail-worker
 ENV HEARTBEAT_FILE=/tmp/worker-alive

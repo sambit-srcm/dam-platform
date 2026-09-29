@@ -3,5 +3,5 @@ import { config } from './config.ts';
 
 export const logger = pino({
   level: config.LOG_LEVEL,
-  base: { service: 'worker' },
+  base: { service: 'thumbnail-worker' },
 });

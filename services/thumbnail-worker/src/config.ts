@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { tmpdir } from 'node:os';
 
 // Every environment variable the worker needs. Nothing else should read process.env.
 const schema = z.object({
@@ -11,6 +12,13 @@ const schema = z.object({
   DB_POOL_MAX: z.coerce.number().default(10),
 
   AMQP_URL: z.string(),
+
+  //ffmpeg path
+  FFMPEG_PATH: z.string().default('ffmpeg'),
+  FFPROBE_PATH: z.string().default('ffprobe'),
+
+  THUMBNAIL_FRAME_MAX_SECONDS: z.coerce.number().default(5),
+  TMP_DIR: z.string().default(tmpdir()),
 
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),
