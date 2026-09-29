@@ -83,3 +83,8 @@ process.on('unhandledRejection', (reason) => {
   logger.error({ err: reason }, 'unhandled rejection');
   process.exit(1);
 });
+
+process.on('uncaughtException', (error) => {
+  logger.error({ err: error }, 'uncaught exception');
+  process.exit(1);
+});

@@ -84,3 +84,8 @@ process.on('unhandledRejection', (reason) => {
   // The interrupted job can't report back once the channel is closed, which is expected
   if (!shuttingDown) process.exit(1);
 });
+
+process.on('uncaughtException', (error) => {
+  logger.error({ err: error }, 'uncaught exception');
+  process.exit(1);
+});
