@@ -8,7 +8,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set in .env}
     ports:
-      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+      - target: 5432
+        published: 5432
+        protocol: tcp
+        mode: host
     volumes:
       - postgres-data:/var/lib/postgresql
     deploy:
@@ -42,8 +45,14 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set in .env}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
     ports:
-      - '127.0.0.1:${MINIO_API_PORT:-9000}:9000'
-      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'
+      - target: 9000
+        published: 9000
+        protocol: tcp
+        mode: host
+      - target: 9001
+        published: 9001
+        protocol: tcp
+        mode: host
     volumes:
       - minio-data:/data
     deploy:
@@ -99,7 +108,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set in .env}
       DB_POOL_MAX: 10
     ports:
-      - '127.0.0.1:3000:3000'
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: host
     deploy:
       replicas: 1
       restart_policy:
@@ -140,7 +152,10 @@ services:
   web:
     image: dam-web:local
     ports:
-      - '127.0.0.1:8080:80'
+      - target: 80
+        published: 8080
+        protocol: tcp
+        mode: host
     deploy:
       replicas: 1
       restart_policy:
