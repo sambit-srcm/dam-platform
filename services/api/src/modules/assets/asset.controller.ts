@@ -1,6 +1,12 @@
 import type { Request, Response } from 'express';
 import type { Context } from '../../shared/lib/context.ts';
-import { downloadAsset, getAsset, listAssetsPage } from './asset.service.ts';
+import {
+  downloadAsset,
+  getAsset,
+  getAssetView,
+  listAssetsPage,
+  listMyTags,
+} from './asset.service.ts';
 import { z } from 'zod';
 import { listAssetsQuery } from './asset.schema.ts';
 import { currentUser } from '../../shared/middlewares/requireAuth.ts';
@@ -21,10 +27,24 @@ export function listAssetsController(ctx: Context) {
   };
 }
 
+export function listTagsController(ctx: Context) {
+  return async (req: Request, res: Response) => {
+    res.json({ items: await listMyTags(ctx, currentUser(req)) });
+  };
+}
+
 export function downloadController(ctx: Context) {
   return async (req: Request, res: Response) => {
     const assetId = z.uuid().parse(req.params.assetId);
 
     res.json(await downloadAsset(ctx, assetId, currentUser(req)));
+  };
+}
+
+export function viewController(ctx: Context) {
+  return async (req: Request, res: Response) => {
+    const assetId = z.uuid().parse(req.params.assetId);
+
+    res.json(await getAssetView(ctx, assetId, currentUser(req)));
   };
 }
