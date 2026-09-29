@@ -1,5 +1,5 @@
 import { assets, type NewAsset, type Db } from '@dam/db';
-import { and, count, desc, eq, lt } from 'drizzle-orm';
+import { and, count, desc, eq, lt, sql } from 'drizzle-orm';
 import type { AssetStatus } from '@dam/db';
 
 export async function createAsset(db: Db, values: NewAsset) {
@@ -55,6 +55,15 @@ export async function markUploadComplete(
   await db
     .update(assets)
     .set({ status, sizeBytes, upload: null, uploadExpiresAt: null })
+    .where(eq(assets.id, id));
+}
+export async function incrementDownloadCount(db: Db, id: string) {
+  await db
+    .update(assets)
+    .set({
+      downloadCount: sql`${assets.downloadCount} + 1`,
+      updatedAt: assets.updatedAt,
+    })
     .where(eq(assets.id, id));
 }
 

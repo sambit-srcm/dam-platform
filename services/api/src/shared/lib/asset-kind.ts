@@ -19,7 +19,7 @@ const JOBS: Record<AssetKind, JobType | null> = {
   document: null,
 };
 
-const DOCUMENT_MIME_TYPES = ['application/pdf'];
+export const DOCUMENT_MIME_TYPES = ['application/pdf'];
 
 export function assetKindFor(mimeType: string): AssetKind {
   if (mimeType.startsWith('image/')) return 'image';

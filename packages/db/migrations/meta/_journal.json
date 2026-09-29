@@ -36,6 +36,13 @@
       "when": 1790352756526,
       "tag": "0004_real_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790661773077,
+      "tag": "0005_confused_scourge",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { assetRoutes } from './modules/assets/asset.routes.ts';
 import { authRoutes } from './modules/auth/auth.routes.ts';
 import { requireAuth } from './shared/middlewares/requireAuth.ts';
 import { uploadRoutes } from './modules/uploads/upload.routes.ts';
+import { adminRoutes } from './modules/admin/admin.routes.ts';
 
 export function createApp(ctx: Context) {
   const app = express();
@@ -27,6 +28,7 @@ export function createApp(ctx: Context) {
 
   app.use('/assets/uploads', uploadRoutes(ctx));
   app.use('/assets', assetRoutes(ctx));
+  app.use('/admin', adminRoutes(ctx));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

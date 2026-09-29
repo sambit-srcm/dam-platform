@@ -34,6 +34,7 @@ export async function createContext(): Promise<Context> {
     useSSL: false,
     accessKey: config.MINIO_ROOT_USER,
     secretKey: config.MINIO_ROOT_PASSWORD,
+    region: 'us-east-1',
   });
 
   const publicUrl = new URL(config.MINIO_PUBLIC_URL);
@@ -45,6 +46,7 @@ export async function createContext(): Promise<Context> {
     useSSL: publicUseSSL,
     accessKey: config.MINIO_ROOT_USER,
     secretKey: config.MINIO_ROOT_PASSWORD,
+    region: 'us-east-1',
   });
 
   return {
