@@ -63,13 +63,16 @@ export function healthRoutes(ctx: Context) {
     const checks = { postgres, redis, minio, rabbitmq };
     const ready = Object.values(checks).every((c) => c.status === 'up');
 
+    // The error text names hosts, users and buckets, so it stays in the log
     if (!ready) {
       req.log.warn({ checks }, 'readiness check failed');
     }
 
     res.status(ready ? 200 : 503).json({
       status: ready ? 'ok' : 'degraded',
-      checks,
+      checks: Object.fromEntries(
+        Object.entries(checks).map(([name, { status }]) => [name, { status }]),
+      ),
     });
   });
 
