@@ -1,4 +1,6 @@
+import cors from 'cors';
 import express from 'express';
+import { config } from './config.ts';
 import type { Context } from './shared/lib/context.ts';
 import { errorHandler } from './shared/middlewares/errorHandler.ts';
 import { notFoundHandler } from './shared/middlewares/notFound.ts';
@@ -17,6 +19,16 @@ export function createApp(ctx: Context) {
   app.set('trust proxy', 1);
 
   app.use(requestLogger);
+
+  // Before auth, so browser preflight requests (which carry no token) get answered
+  app.use(
+    cors({
+      origin: config.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      allowedHeaders: ['Authorization', 'Content-Type'],
+      maxAge: 600,
+    }),
+  );
   app.use(express.json({ limit: '1mb' }));
 
   // Public: probes and nginx need health without a login, and people need /auth to get one
