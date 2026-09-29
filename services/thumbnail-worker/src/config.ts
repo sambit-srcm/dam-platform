@@ -15,9 +15,7 @@ const schema = z.object({
 
   //ffmpeg path
   FFMPEG_PATH: z.string().default('ffmpeg'),
-  FFPROBE_PATH: z.string().default('ffprobe'),
 
-  THUMBNAIL_FRAME_MAX_SECONDS: z.coerce.number().default(5),
   TMP_DIR: z.string().default(tmpdir()),
 
   MINIO_ENDPOINT: z.string(),

@@ -1,6 +1,12 @@
-import { assets, type NewAsset, type Db } from '@dam/db';
+import { assets, renditions, type NewAsset, type Db } from '@dam/db';
 import { and, count, desc, eq, lt, sql } from 'drizzle-orm';
 import type { AssetStatus } from '@dam/db';
+import {
+  assetOrder,
+  assetWhere,
+  type AssetFilters,
+  type AssetSort,
+} from './asset.filters.ts';
 
 export async function createAsset(db: Db, values: NewAsset) {
   const [asset] = await db.insert(assets).values(values).returning();
@@ -12,37 +18,57 @@ export async function findAssetById(db: Db, id: string) {
   return asset;
 }
 
+// Largest first, so the first one is the default to play
+export async function findRenditions(db: Db, assetId: string) {
+  return db
+    .select()
+    .from(renditions)
+    .where(eq(renditions.assetId, assetId))
+    .orderBy(desc(renditions.height));
+}
+
 export async function listAssets(
   db: Db,
   {
     limit,
     offset,
-    status,
-    ownerId,
-  }: {
+    sort,
+    ...filters
+  }: AssetFilters & {
     limit: number;
     offset: number;
-    status?: AssetStatus;
+    sort: AssetSort;
     ownerId: string;
   },
 ) {
-  const where = and(
-    status ? eq(assets.status, status) : undefined,
-    eq(assets.ownerId, ownerId),
-  );
+  const where = assetWhere(filters);
 
   const [rows, [total]] = await Promise.all([
     db
       .select()
       .from(assets)
       .where(where)
-      .orderBy(desc(assets.createdAt))
+      .orderBy(...assetOrder(sort))
       .limit(limit)
       .offset(offset),
     db.select({ value: count() }).from(assets).where(where),
   ]);
 
   return { rows, total: Number(total?.value ?? 0) };
+}
+
+// Every tag in use with how many assets have it, most used first
+export async function listTags(db: Db, ownerId?: string) {
+  const { rows } = await db.execute<{ tag: string; count: number }>(sql`
+    select tag, count(*)::int as count
+    from (
+      select unnest(tags) as tag from assets
+      ${ownerId ? sql`where owner_id = ${ownerId}` : sql``}
+    ) as used
+    group by tag
+    order by count desc, tag
+    limit 100`);
+  return rows;
 }
 
 // Size comes from the finished object in storage, not from what the caller declared

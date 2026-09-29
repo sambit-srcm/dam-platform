@@ -13,6 +13,7 @@ import {
   markAssetFailed,
   markAssetProcessing,
 } from './repository.ts';
+import { videoTags } from './tags.ts';
 import { transcodeRung } from './transcode.ts';
 
 export async function processVideo(ctx: Context, assetId: string) {
@@ -72,6 +73,7 @@ export async function processVideo(ctx: Context, assetId: string) {
 
       await completeVideoAsset(ctx.db, assetId, {
         metadata,
+        tags: videoTags(metadata),
         outputs,
       });
       log.info({ renditions: outputs.length }, 'video ready');

@@ -30,3 +30,20 @@ export async function downloadUrl(ctx: Context, asset: AssetFile) {
     { 'response-content-disposition': contentDisposition(asset.filename) },
   );
 }
+
+// Opens in the browser instead of downloading, so it must never bump the download count
+export async function viewUrl(
+  ctx: Context,
+  storageKey: string,
+  mimeType: string,
+) {
+  return ctx.publicStorage.presignedGetObject(
+    ctx.bucket,
+    storageKey,
+    config.VIEW_TTL_SECONDS,
+    {
+      'response-content-type': mimeType,
+      'response-content-disposition': 'inline',
+    },
+  );
+}

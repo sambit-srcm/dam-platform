@@ -36,6 +36,7 @@ import {
 } from './upload.session.ts';
 import { planParts } from './utils/part-plan.ts';
 import { logger } from '../../shared/lib/logger.ts';
+import { tagsForUpload } from '../../shared/lib/tags.ts';
 
 export async function startUpload(
   ctx: Context,
@@ -60,6 +61,7 @@ export async function startUpload(
     sizeBytes: input.size,
     storageKey,
     ownerId: actor.id,
+    tags: tagsForUpload(input.filename, input.mimeType),
     status: 'uploading',
     upload: { uploadId: created.UploadId!, partSize, partCount },
     uploadExpiresAt: new Date(

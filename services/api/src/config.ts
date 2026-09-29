@@ -19,7 +19,11 @@ const schema = z.object({
   MINIO_PUBLIC_URL: z.string().default('http://localhost:9000'),
   PRESIGNED_TTL_SECONDS: z.coerce.number().default(60 * 15), // 15 minutes
   THUMBNAIL_TTL_SECONDS: z.coerce.number().default(60 * 60), // longer 1h for browser cache
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  VIEW_TTL_SECONDS: z.coerce.number().default(60 * 60), // must outlast a video being watched
+  // Browser origins allowed to call the API, comma separated
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:5173,http://localhost:8080'),
 
   // Ceiling for a resumable multipart upload
   MAX_UPLOAD_GB: z.coerce.number().default(5),

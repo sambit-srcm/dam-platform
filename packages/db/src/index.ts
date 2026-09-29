@@ -22,3 +22,4 @@ export async function pingDb(db: Db) {
 
 export * from './constants.ts';
 export * from './schema.ts';
+export * from './tags.ts';

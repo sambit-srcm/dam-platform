@@ -2,17 +2,46 @@ import axios from 'axios';
 import { http } from '../../lib/http';
 import type {
   AssetListResponse,
+  AssetView,
   ListAssetsParams,
   SignedPart,
+  TagCount,
   UploadedAsset,
   UploadSession,
 } from './types';
 
+// The API wants tags as one comma separated value, and no empty parameters
+export function toQuery(params: ListAssetsParams) {
+  return {
+    ...params,
+    q: params.q || undefined,
+    tags: params.tags?.join(',') || undefined,
+  };
+}
+
 export async function getAssets(
   params: ListAssetsParams = {},
 ): Promise<AssetListResponse> {
-  const res = await http.get<AssetListResponse>('/assets', { params });
+  const res = await http.get<AssetListResponse>('/assets', {
+    params: toQuery(params),
+  });
   return res.data;
+}
+
+export async function getTags(): Promise<TagCount[]> {
+  const res = await http.get<{ items: TagCount[] }>('/assets/tags');
+  return res.data.items;
+}
+
+export async function getAssetView(id: string): Promise<AssetView> {
+  const res = await http.get<AssetView>(`/assets/${id}/view`);
+  return res.data;
+}
+
+// Counts as a download, unlike viewing
+export async function getDownloadUrl(id: string): Promise<string> {
+  const res = await http.post<{ url: string }>(`/assets/${id}/download`);
+  return res.data.url;
 }
 
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;

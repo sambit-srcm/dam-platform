@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buffer } from 'node:stream/consumers';
-import type { Asset } from '@dam/db';
+import type { Asset, ImageMetadata } from '@dam/db';
 import { NonRetryableJobError } from '@dam/queue';
 import sharp from 'sharp';
 import { config } from './config.ts';
@@ -17,10 +17,7 @@ import {
   updateAssetThumbnail,
 } from './repository.ts';
 
-const PROBE_TIMEOUT_MS = 60_000;
 const FRAME_TIMEOUT_MS = 60_000;
-// The frame is taken this far into the video, up to THUMBNAIL_FRAME_MAX_SECONDS
-const FRAME_POSITION = 0.1;
 
 export async function processThumbnail(ctx: Context, assetId: string) {
   const asset = await findAssetById(ctx.db, assetId);
@@ -63,6 +60,28 @@ async function uploadThumbnail(
   return thumbnailKey;
 }
 
+// Sizes are after rotation, the way the picture is shown
+async function readImageDetails(input: Buffer): Promise<ImageMetadata> {
+  const { width, height, format, orientation } = await sharp(input).metadata();
+  if (!width || !height || !format) throw new Error('the image has no size');
+
+  // Orientations 5 to 8 store the picture on its side
+  const onItsSide = orientation !== undefined && orientation >= 5;
+  return onItsSide
+    ? { width: height, height: width, format }
+    : { width, height, format };
+}
+
+function imageTags({ width, height }: ImageMetadata) {
+  const pixels = width * height;
+  const tags = [
+    width === height ? 'square' : width > height ? 'landscape' : 'portrait',
+  ];
+  if (pixels >= 8_000_000) tags.push('high-res');
+  if (pixels < 500_000) tags.push('low-res');
+  return tags;
+}
+
 async function processImage(ctx: Context, asset: Asset) {
   // Jobs are delivered at least once, so a repeat of finished work is dropped
   if (asset.status === 'ready' && asset.thumbnailKey) return;
@@ -78,7 +97,9 @@ async function processImage(ctx: Context, asset: Asset) {
   );
 
   let thumbnail: Buffer;
+  let metadata: ImageMetadata;
   try {
+    metadata = await readImageDetails(original);
     thumbnail = await makeThumbnail(original);
   } catch (error) {
     // A file that can't be decoded will never succeed, so stop retrying it
@@ -91,51 +112,43 @@ async function processImage(ctx: Context, asset: Asset) {
   }
 
   const thumbnailKey = await uploadThumbnail(ctx, asset.id, thumbnail);
-  await markAssetReady(ctx.db, asset.id, thumbnailKey);
+  await markAssetReady(ctx.db, asset.id, {
+    thumbnailKey,
+    metadata,
+    tags: imageTags(metadata),
+  });
   log.info({ thumbnailKey, bytes: thumbnail.length }, 'thumbnail created');
 }
 
-async function videoDuration(source: string) {
-  const { stdout } = await run(
-    config.FFPROBE_PATH,
-    [
-      '-v',
-      'error',
-      '-show_entries',
-      'format=duration',
-      '-of',
-      'default=noprint_wrappers=1:nokey=1',
-      source,
-    ],
-    { timeoutMs: PROBE_TIMEOUT_MS },
-  );
-  const seconds = Number(stdout.trim());
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
-}
-
-// Returns false when there is no frame at that position
-async function extractFrame(source: string, output: string, seconds: number) {
-  await run(
-    config.FFMPEG_PATH,
-    [
-      '-v',
-      'error',
-      '-ss',
-      seconds.toFixed(3),
-      '-i',
-      source,
-      '-frames:v',
-      '1',
-      '-y',
-      output,
-    ],
-    { timeoutMs: FRAME_TIMEOUT_MS },
-  );
-  // A seek past the real end makes ffmpeg exit cleanly without writing a file
-  return stat(output).then(
-    () => true,
-    () => false,
-  );
+// A frame from the first seconds. A video shorter than that has no frame at 1s, so it falls back to the start.
+async function extractFrame(source: string, output: string) {
+  for (const seconds of [1, 0]) {
+    await run(
+      config.FFMPEG_PATH,
+      [
+        '-v',
+        'error',
+        '-ss',
+        String(seconds),
+        '-i',
+        source,
+        '-frames:v',
+        '1',
+        '-y',
+        output,
+      ],
+      { timeoutMs: FRAME_TIMEOUT_MS },
+    );
+    // A seek past the end makes ffmpeg exit cleanly without writing a file
+    if (
+      await stat(output).then(
+        () => true,
+        () => false,
+      )
+    )
+      return;
+  }
+  throw new NonRetryableJobError('The video has no frame to use');
 }
 
 // The video worker owns the status, so this only ever sets the thumbnail key
@@ -143,53 +156,30 @@ async function processVideo(ctx: Context, asset: Asset) {
   // The video worker already gave up on this file
   if (asset.status === 'failed') return;
 
-  const log = logger.child({
-    assetId: asset.id,
-    storageKey: asset.storageKey,
-  });
-
   await withTempDir(async (dir) => {
     const source = join(dir, 'source');
     const frame = join(dir, 'frame.png');
 
     await ctx.storage.fGetObject(ctx.bucket, asset.storageKey, source);
 
-    let gotFrame: boolean;
     try {
-      const duration = await videoDuration(source);
-      const at = Math.min(
-        duration * FRAME_POSITION,
-        config.THUMBNAIL_FRAME_MAX_SECONDS,
-      );
-      gotFrame =
-        (await extractFrame(source, frame, at)) ||
-        (at > 0 && (await extractFrame(source, frame, 0)));
+      await extractFrame(source, frame);
     } catch (error) {
       // A timeout may pass on a retry; a file ffmpeg rejects never will
       if (error instanceof ExecError && !error.timedOut) {
         throw new NonRetryableJobError(
-          `Asset ${asset.id} could not be read by ffmpeg: ${error.stderr.trim().slice(-300)}`,
+          `ffmpeg could not read the video: ${error.stderr.trim().slice(-300)}`,
         );
       }
       throw error;
     }
-    if (!gotFrame) {
-      throw new NonRetryableJobError(`Asset ${asset.id} has no video frame`);
-    }
 
-    let thumbnail: Buffer;
-    try {
-      thumbnail = await makeThumbnail(frame);
-    } catch (error) {
-      throw new NonRetryableJobError(
-        `Asset ${asset.id} frame could not be converted: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-
+    const thumbnail = await makeThumbnail(frame);
     const thumbnailKey = await uploadThumbnail(ctx, asset.id, thumbnail);
     await updateAssetThumbnail(ctx.db, asset.id, thumbnailKey);
-    log.info({ thumbnailKey, bytes: thumbnail.length }, 'video poster created');
+    logger.info(
+      { assetId: asset.id, thumbnailKey, bytes: thumbnail.length },
+      'video poster created',
+    );
   });
 }

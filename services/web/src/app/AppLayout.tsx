@@ -41,6 +41,16 @@ export function AppLayout() {
               <NavLink to="/upload" className={navClass}>
                 Upload
               </NavLink>
+              {user?.role === 'admin' && (
+                <>
+                  <NavLink to="/admin" end className={navClass}>
+                    Dashboard
+                  </NavLink>
+                  <NavLink to="/admin/assets" className={navClass}>
+                    All assets
+                  </NavLink>
+                </>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4">

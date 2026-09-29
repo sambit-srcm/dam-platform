@@ -10,6 +10,7 @@ import {
   jsonb,
   unique,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { ASSET_STATUSES, USER_ROLES } from './constants.ts';
 
 export type UploadedSession = {
@@ -25,6 +26,14 @@ export type VideoMetadata = {
   videoCodec: string;
   audioCodec: string | null;
 };
+
+// What the thumbnail worker learns about an image. Sizes are after rotation.
+export type ImageMetadata = {
+  width: number;
+  height: number;
+  format: string;
+};
+export type AssetMetadata = ImageMetadata | VideoMetadata;
 
 export const assetStatus = pgEnum('asset_status', ASSET_STATUSES);
 export const userRole = pgEnum('user_role', USER_ROLES);
@@ -56,8 +65,13 @@ export const assets = pgTable(
     thumbnailKey: text(),
     status: assetStatus().notNull().default('uploaded'),
     upload: jsonb().$type<UploadedSession>(),
-    // Set by the video worker; empty for images and documents
-    metadata: jsonb().$type<VideoMetadata>(),
+    // Set by the workers; empty for documents
+    metadata: jsonb().$type<AssetMetadata>(),
+    // Made from the filename and file details
+    tags: text()
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     uploadExpiresAt: timestamp({ withTimezone: true }),
     //column for handling download counts
     downloadCount: integer().notNull().default(0),
@@ -74,6 +88,12 @@ export const assets = pgTable(
     index('assets_status_idx').on(table.status),
     index('assets_created_at_idx').on(table.createdAt),
     index('assets_upload_expires_at_idx').on(table.uploadExpiresAt),
+    index('assets_tags_idx').using('gin', table.tags),
+    // Makes searching for part of a filename fast
+    index('assets_filename_trgm_idx').using(
+      'gin',
+      table.filename.op('gin_trgm_ops'),
+    ),
   ],
 );
 
