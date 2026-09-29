@@ -16,6 +16,10 @@ export const queues = {
     queue: 'dam.video-processing',
     deadLetterQueue: 'dam.video-processing.dlq',
   },
+  'thumbnail.generate': {
+    queue: 'dam.thumbnail-generation',
+    deadLetterQueue: 'dam.thumbnail-generation.dlq',
+  },
 } satisfies Record<JobType, { queue: string; deadLetterQueue: string }>;
 
 // Declares exchanges, queues and bindings. Safe to run on every startup.

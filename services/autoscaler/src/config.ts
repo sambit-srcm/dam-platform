@@ -20,7 +20,7 @@ const schema = z.object({
   SCALE_DOWN_COOLDOWN_POLLS: z.coerce.number().default(3),
 
   IMAGE_QUEUE: z.string().default('dam.image-processing'),
-  IMAGE_SERVICE: z.string().default('worker'),
+  IMAGE_SERVICE: z.string().default('thumbnail-worker'),
   IMAGE_MIN_REPLICAS: z.coerce.number().default(1),
   IMAGE_MAX_REPLICAS: z.coerce.number().default(6),
   // Add one replica for every this-many messages waiting in the queue

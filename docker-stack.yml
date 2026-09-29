@@ -117,8 +117,8 @@ services:
       restart_policy:
         condition: on-failure
 
-  worker:
-    image: dam-worker:local
+  thumbnail-worker:
+    image: dam-thumbnail-worker:local
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AMQP_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672

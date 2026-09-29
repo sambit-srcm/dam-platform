@@ -2,6 +2,7 @@
 export type JobPayloads = {
   'image.process': { assetId: string };
   'video.process': { assetId: string };
+  'thumbnail.generate': { assetId: string };
 };
 
 export type JobType = keyof JobPayloads;
