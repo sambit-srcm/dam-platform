@@ -27,6 +27,94 @@ const STATUS_STYLES: Record<AssetStatus, string> = {
   failed: 'bg-red-100 text-red-700',
 };
 
+export function AssetTable({
+  items,
+  onSelect,
+}: {
+  items: AdminAsset[];
+  onSelect: (asset: AdminAsset) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
+          <tr>
+            <th className="px-3 py-2 font-medium">Asset</th>
+            <th className="px-3 py-2 font-medium">Tags</th>
+            <th className="px-3 py-2 font-medium">Owner</th>
+            <th className="px-3 py-2 font-medium">Size</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Downloads</th>
+            <th className="px-3 py-2 font-medium">Uploaded</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {items.map((asset) => (
+            <tr
+              key={asset.id}
+              onClick={() =>
+                asset.status === 'ready' ? onSelect(asset) : undefined
+              }
+              className={
+                asset.status === 'ready'
+                  ? 'cursor-pointer hover:bg-gray-50'
+                  : ''
+              }
+            >
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-gray-100">
+                    {asset.thumbnailUrl && (
+                      <img
+                        src={asset.thumbnailUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <span
+                    className="max-w-56 truncate font-medium"
+                    title={asset.filename}
+                  >
+                    {asset.filename}
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-2">
+                <TagList tags={asset.tags} max={3} />
+              </td>
+              <td className="px-3 py-2 text-gray-600">
+                {asset.ownerEmail ?? 'No owner'}
+              </td>
+              <td className="px-3 py-2 text-gray-600">
+                {formatSize(asset.sizeBytes)}
+              </td>
+              <td className="px-3 py-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[asset.status]}`}
+                >
+                  {asset.status}
+                </span>
+              </td>
+              <td className="px-3 py-2 text-gray-600">{asset.downloadCount}</td>
+              <td className="px-3 py-2 text-gray-600">
+                {formatDate(asset.createdAt)}
+              </td>
+            </tr>
+          ))}
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                No assets match
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function AdminAssetsPage() {
   const { filters, offset, update } = useAssetQuery();
   const { page, error } = useAssetSearch(
@@ -52,88 +140,7 @@ export function AdminAssetsPage() {
 
       {page && (
         <>
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Asset</th>
-                  <th className="px-3 py-2 font-medium">Tags</th>
-                  <th className="px-3 py-2 font-medium">Owner</th>
-                  <th className="px-3 py-2 font-medium">Size</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Downloads</th>
-                  <th className="px-3 py-2 font-medium">Uploaded</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {page.items.map((asset) => (
-                  <tr
-                    key={asset.id}
-                    onClick={() =>
-                      asset.status === 'ready' ? setSelected(asset) : undefined
-                    }
-                    className={
-                      asset.status === 'ready'
-                        ? 'cursor-pointer hover:bg-gray-50'
-                        : ''
-                    }
-                  >
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-gray-100">
-                          {asset.thumbnailUrl && (
-                            <img
-                              src={asset.thumbnailUrl}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                          )}
-                        </div>
-                        <span
-                          className="max-w-56 truncate font-medium"
-                          title={asset.filename}
-                        >
-                          {asset.filename}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <TagList tags={asset.tags} max={3} />
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {asset.ownerEmail ?? 'No owner'}
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {formatSize(asset.sizeBytes)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[asset.status]}`}
-                      >
-                        {asset.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {asset.downloadCount}
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {formatDate(asset.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-                {page.items.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-3 py-8 text-center text-gray-400"
-                    >
-                      No assets match
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <AssetTable items={page.items} onSelect={setSelected} />
 
           <Pager
             offset={offset}

@@ -6,6 +6,7 @@ import type {
   AssetStatus,
   TagCount,
 } from './types';
+import { CLEARED_FILTERS, toggleTag } from './filterActions';
 
 const TYPES: AssetKind[] = ['image', 'video', 'document'];
 const STATUSES: AssetStatus[] = [
@@ -63,25 +64,14 @@ export function AssetFilterBar({
     );
   }
 
-  function toggleTag(tag: string) {
-    const current = filters.tags ?? [];
-    const next = current.includes(tag)
-      ? current.filter((t) => t !== tag)
-      : [...current, tag];
-    onChange({ tags: next.length > 0 ? next : undefined });
+  function pickTag(tag: string) {
+    onChange({ tags: toggleTag(filters.tags, tag) });
   }
 
   function clear() {
     window.clearTimeout(timer.current);
     setText('');
-    onChange({
-      q: undefined,
-      type: undefined,
-      tags: undefined,
-      status: undefined,
-      from: undefined,
-      to: undefined,
-    });
+    onChange(CLEARED_FILTERS);
   }
 
   const filtered = Boolean(
@@ -182,7 +172,7 @@ export function AssetFilterBar({
               <button
                 key={tag}
                 type="button"
-                onClick={() => toggleTag(tag)}
+                onClick={() => pickTag(tag)}
                 aria-pressed={active}
                 className={`rounded-full border px-2.5 py-0.5 text-xs transition ${
                   active

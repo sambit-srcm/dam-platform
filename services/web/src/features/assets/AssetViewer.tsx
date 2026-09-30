@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getErrorMessage } from '../../lib/http';
+import { loadViewState } from './loadViewState';
 import { TagList } from './TagList';
 import type { AssetView, VideoSource } from './types';
 
@@ -15,7 +15,7 @@ type Props = {
   onClose: () => void;
 };
 
-type ViewState =
+export type ViewState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; view: AssetView };
@@ -84,6 +84,46 @@ function VideoPlayer({
   );
 }
 
+export function ViewerBody({
+  state,
+  filename,
+  poster,
+}: {
+  state: ViewState;
+  filename: string;
+  poster?: string | null;
+}) {
+  return (
+    <>
+      {state.status === 'loading' && (
+        <p className="py-16 text-center text-sm text-gray-500">Loading…</p>
+      )}
+      {state.status === 'error' && (
+        <p className="py-16 text-center text-sm text-red-600">
+          {state.message}
+        </p>
+      )}
+      {state.status === 'ready' && state.view.kind === 'video' && (
+        <VideoPlayer sources={state.view.renditions} poster={poster} />
+      )}
+      {state.status === 'ready' && state.view.kind === 'image' && (
+        <img
+          src={state.view.url}
+          alt={filename}
+          className="mx-auto max-h-[75vh] object-contain"
+        />
+      )}
+      {state.status === 'ready' && state.view.kind === 'document' && (
+        <iframe
+          src={state.view.url}
+          title={filename}
+          className="h-[75vh] w-full rounded border border-gray-200"
+        />
+      )}
+    </>
+  );
+}
+
 export function AssetViewer({
   assetId,
   filename,
@@ -98,16 +138,7 @@ export function AssetViewer({
   useEffect(() => {
     let cancelled = false;
 
-    loadView(assetId).then(
-      (view) => {
-        if (!cancelled) setState({ status: 'ready', view });
-      },
-      (error: unknown) => {
-        if (!cancelled) {
-          setState({ status: 'error', message: getErrorMessage(error) });
-        }
-      },
-    );
+    void loadViewState(loadView, assetId, () => cancelled, setState);
 
     return () => {
       cancelled = true;
@@ -165,31 +196,7 @@ export function AssetViewer({
         )}
 
         <div className="overflow-auto p-4">
-          {state.status === 'loading' && (
-            <p className="py-16 text-center text-sm text-gray-500">Loading…</p>
-          )}
-          {state.status === 'error' && (
-            <p className="py-16 text-center text-sm text-red-600">
-              {state.message}
-            </p>
-          )}
-          {state.status === 'ready' && state.view.kind === 'video' && (
-            <VideoPlayer sources={state.view.renditions} poster={poster} />
-          )}
-          {state.status === 'ready' && state.view.kind === 'image' && (
-            <img
-              src={state.view.url}
-              alt={filename}
-              className="mx-auto max-h-[75vh] object-contain"
-            />
-          )}
-          {state.status === 'ready' && state.view.kind === 'document' && (
-            <iframe
-              src={state.view.url}
-              title={filename}
-              className="h-[75vh] w-full rounded border border-gray-200"
-            />
-          )}
+          <ViewerBody state={state} filename={filename} poster={poster} />
         </div>
       </div>
     </div>

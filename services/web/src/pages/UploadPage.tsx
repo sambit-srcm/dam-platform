@@ -1,17 +1,10 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { MAX_UPLOAD_BYTES, uploadAsset } from '../features/assets/api';
+import { uploadAsset } from '../features/assets/api';
+import { toUploadItem, type UploadItem } from '../features/assets/uploadItem';
 import { getErrorMessage } from '../lib/http';
 
 const ACCEPT = 'image/*,video/*,application/pdf';
-
-type UploadItem = {
-  id: string;
-  file: File;
-  state: 'queued' | 'uploading' | 'done' | 'error';
-  progress: number;
-  error?: string;
-};
 
 const STATE_STYLES: Record<UploadItem['state'], string> = {
   queued: 'text-gray-500',
@@ -19,6 +12,38 @@ const STATE_STYLES: Record<UploadItem['state'], string> = {
   done: 'text-green-600',
   error: 'text-red-600',
 };
+
+export function UploadList({ items }: { items: UploadItem[] }) {
+  return (
+    <ul className="mt-6 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+      {items.map((item) => (
+        <li key={item.id} className="p-3">
+          <div className="flex items-center justify-between gap-4">
+            <p className="truncate text-sm" title={item.file.name}>
+              {item.file.name}
+            </p>
+            <span
+              className={`shrink-0 text-xs font-medium ${STATE_STYLES[item.state]}`}
+            >
+              {item.state === 'uploading' ? `${item.progress}%` : item.state}
+            </span>
+          </div>
+          {item.state === 'uploading' && (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full bg-blue-500 transition-all"
+                style={{ width: `${item.progress}%` }}
+              />
+            </div>
+          )}
+          {item.error && (
+            <p className="mt-1 text-xs text-red-600">{item.error}</p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function UploadPage() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,17 +59,7 @@ export function UploadPage() {
   const addFiles = (files: FileList | null) => {
     if (!files) return;
 
-    const added = Array.from(files).map<UploadItem>((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      state: file.size > MAX_UPLOAD_BYTES ? 'error' : 'queued',
-      progress: 0,
-      error:
-        file.size > MAX_UPLOAD_BYTES
-          ? 'Larger than the 5 GB upload limit'
-          : undefined,
-    }));
-    setItems((current) => [...current, ...added]);
+    setItems((current) => [...current, ...Array.from(files).map(toUploadItem)]);
   };
 
   const uploadAll = async () => {
@@ -109,35 +124,7 @@ export function UploadPage() {
 
       {items.length > 0 && (
         <>
-          <ul className="mt-6 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
-            {items.map((item) => (
-              <li key={item.id} className="p-3">
-                <div className="flex items-center justify-between gap-4">
-                  <p className="truncate text-sm" title={item.file.name}>
-                    {item.file.name}
-                  </p>
-                  <span
-                    className={`shrink-0 text-xs font-medium ${STATE_STYLES[item.state]}`}
-                  >
-                    {item.state === 'uploading'
-                      ? `${item.progress}%`
-                      : item.state}
-                  </span>
-                </div>
-                {item.state === 'uploading' && (
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full bg-blue-500 transition-all"
-                      style={{ width: `${item.progress}%` }}
-                    />
-                  </div>
-                )}
-                {item.error && (
-                  <p className="mt-1 text-xs text-red-600">{item.error}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <UploadList items={items} />
 
           <div className="mt-4 flex items-center gap-3">
             <button
