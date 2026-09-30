@@ -102,11 +102,7 @@ The full REST API is described in [`docs/openapi.yaml`](docs/openapi.yaml) (Open
 
 Errors always look like `{ "error": { "code", "message", "requestId" } }`.
 
-To browse the spec locally:
-
-```bash
-npx @redocly/cli preview-docs docs/openapi.yaml
-```
+The API serves its own docs, no login needed: `http://localhost:8080/api/docs/` through the web container, or `http://localhost:3000/docs/` directly. The raw spec is at `/docs/openapi.yaml`.
 
 ## Project Structure
 

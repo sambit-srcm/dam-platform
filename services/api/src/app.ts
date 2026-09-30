@@ -5,6 +5,7 @@ import type { Context } from './shared/lib/context.ts';
 import { errorHandler } from './shared/middlewares/errorHandler.ts';
 import { notFoundHandler } from './shared/middlewares/notFound.ts';
 import { healthRoutes } from './health.ts';
+import { docsRoutes } from './docs.ts';
 import { requestLogger } from './shared/middlewares/requestLogger.ts';
 import { assetRoutes } from './modules/assets/asset.routes.ts';
 import { authRoutes } from './modules/auth/auth.routes.ts';
@@ -31,9 +32,10 @@ export function createApp(ctx: Context) {
   );
   app.use(express.json({ limit: '1mb' }));
 
-  // Public: probes and nginx need health without a login, and people need /auth to get one
+  // Public: probes and nginx need health without a login, people need /auth to get one, and the docs are open to read
   app.use('/health', healthRoutes(ctx));
   app.use('/auth', authRoutes(ctx));
+  app.use('/docs', docsRoutes());
 
   // Everything mounted below this line needs a valid token
   app.use(requireAuth);
