@@ -42,7 +42,6 @@ export async function setupTopology(channel: Channel) {
         'x-dead-letter-exchange': DEAD_LETTER_EXCHANGE,
         // Keeps the message in this queue until the dead letter queue confirms it
         'x-dead-letter-strategy': 'at-least-once',
-        'x-overflow': 'reject-publish',
       },
     });
     await channel.bindQueue(queue, JOBS_EXCHANGE, jobType);

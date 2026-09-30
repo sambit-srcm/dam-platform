@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   connect,
   type ChannelModel,
@@ -116,8 +117,8 @@ export async function consumeJobs<T extends JobType>(
             willRetry,
             payload,
           });
-        } catch {
-          // A broken error handler must not take the consumer down
+        } catch (reporterError) {
+          console.error('onError handler threw', reporterError);
         }
       };
 
@@ -175,18 +176,50 @@ export async function replayDeadLetters(
   return replayed;
 }
 
+// Ids of jobs RabbitMQ handed back because no queue was bound for them
+const returnedByChannel = new WeakMap<ConfirmChannel, Set<string>>();
+
+function returnedJobs(channel: ConfirmChannel) {
+  let returned = returnedByChannel.get(channel);
+  if (!returned) {
+    const ids = new Set<string>();
+    channel.on('return', (message: ConsumeMessage) => {
+      ids.add(String(message.properties.messageId));
+    });
+    returnedByChannel.set(channel, ids);
+    returned = ids;
+  }
+  return returned;
+}
+
+// A job with no queue to go to is still confirmed, so without "mandatory" it would
+// vanish. RabbitMQ sends the return before the confirm, so it is known by then.
 function publishConfirmed(
   channel: ConfirmChannel,
   type: JobType,
   content: Buffer,
 ) {
+  const returned = returnedJobs(channel);
+  const messageId = randomUUID();
+
   return new Promise<void>((resolve, reject) => {
     channel.publish(
       JOBS_EXCHANGE,
       type,
       content,
-      { persistent: true, contentType: 'application/json' },
-      (error) => (error ? reject(error) : resolve()),
+      {
+        persistent: true,
+        contentType: 'application/json',
+        mandatory: true,
+        messageId,
+      },
+      (error) => {
+        if (error) return reject(error);
+        if (returned.delete(messageId)) {
+          return reject(new Error(`No queue is bound for "${type}" jobs`));
+        }
+        resolve();
+      },
     );
   });
 }

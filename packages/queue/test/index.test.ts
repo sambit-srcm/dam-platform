@@ -145,32 +145,71 @@ describe('doing jobs', () => {
   });
 });
 
+// A pretend publish channel. "returnIt" makes RabbitMQ hand the job back as unroutable.
+function publishChannel(options: { error?: Error; returnIt?: boolean } = {}) {
+  let onReturn: ((message: ConsumeMessage) => void) | undefined;
+  const publish = vi.fn(
+    (
+      _exchange: string,
+      _key: string,
+      _content: Buffer,
+      opts: { messageId: string },
+      done: (e?: Error) => void,
+    ) => {
+      // Like RabbitMQ: the return arrives before the confirm
+      if (options.returnIt) {
+        onReturn?.({
+          properties: { messageId: opts.messageId },
+        } as unknown as ConsumeMessage);
+      }
+      done(options.error);
+    },
+  );
+  const on = vi.fn((event: string, listener: typeof onReturn) => {
+    if (event === 'return') onReturn = listener;
+  });
+  const jobQueue = { publishChannel: { publish, on } } as unknown as JobQueue;
+  return { publish, jobQueue };
+}
+
 describe('adding a job to the queue', () => {
   it('sends it as saved JSON under the job name, and waits for RabbitMQ to confirm', async () => {
-    const publish = vi.fn(
-      (_ex, _key, _content, _opts, done: (e?: Error) => void) => done(),
-    );
-    const jobQueue = { publishChannel: { publish } } as unknown as JobQueue;
+    const { publish, jobQueue } = publishChannel();
 
     await publishJob(jobQueue, 'thumbnail.generate', { assetId: 'a1' });
 
     const [exchange, key, content, options] = publish.mock.calls[0]!;
     expect(exchange).toBe(JOBS_EXCHANGE);
     expect(key).toBe('thumbnail.generate');
-    expect(JSON.parse((content as Buffer).toString())).toEqual({
-      assetId: 'a1',
-    });
-    expect(options).toMatchObject({ persistent: true });
+    expect(JSON.parse(content.toString())).toEqual({ assetId: 'a1' });
+    expect(options).toMatchObject({ persistent: true, mandatory: true });
   });
 
   it('fails if RabbitMQ refuses the job', async () => {
-    const publish = vi.fn((_e, _k, _c, _o, done: (e?: Error) => void) =>
-      done(new Error('queue full')),
-    );
-    const jobQueue = { publishChannel: { publish } } as unknown as JobQueue;
+    const { jobQueue } = publishChannel({ error: new Error('queue full') });
 
     await expect(
       publishJob(jobQueue, 'video.process', { assetId: 'a1' }),
     ).rejects.toThrow('queue full');
+  });
+
+  it('fails instead of losing the job when no queue is bound for it', async () => {
+    const { jobQueue } = publishChannel({ returnIt: true });
+
+    await expect(
+      publishJob(jobQueue, 'video.process', { assetId: 'a1' }),
+    ).rejects.toThrow('No queue is bound for "video.process" jobs');
+  });
+
+  it('keeps working for the next job after one was returned', async () => {
+    const { jobQueue } = publishChannel({ returnIt: true });
+    await publishJob(jobQueue, 'video.process', { assetId: 'a1' }).catch(
+      () => undefined,
+    );
+
+    const ok = publishChannel();
+    await expect(
+      publishJob(ok.jobQueue, 'video.process', { assetId: 'a2' }),
+    ).resolves.toBeUndefined();
   });
 });
