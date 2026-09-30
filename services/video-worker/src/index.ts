@@ -13,7 +13,10 @@ function touchHeartbeat() {
   writeFileSync(config.HEARTBEAT_FILE, Date.now().toString());
 }
 touchHeartbeat();
-const heartbeatTimer = setInterval(touchHeartbeat, 30_000);
+const heartbeatTimer = setInterval(
+  touchHeartbeat,
+  config.HEARTBEAT_INTERVAL_MS,
+);
 heartbeatTimer.unref();
 
 // The job running right now, so shutdown can wait for it to clean up after itself

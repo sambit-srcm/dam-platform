@@ -26,6 +26,16 @@ const schema = z.object({
   FFMPEG_PATH: z.string().default('ffmpeg'),
   FFPROBE_PATH: z.string().default('ffprobe'),
   HEARTBEAT_FILE: z.string().default('/tmp/worker-alive'),
+  // The Dockerfile healthcheck wants the file touched within the last minute
+  HEARTBEAT_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(50_000)
+    .default(30_000),
+  PROBE_TIMEOUT_MS: z.coerce.number().default(60_000),
+  // Floor for one rendition; longer videos get about four times their length
+  TRANSCODE_MIN_TIMEOUT_MS: z.coerce.number().default(10 * 60_000),
   // Files beyond these limits are rejected instead of being transcoded
   MAX_DURATION_SECONDS: z.coerce.number().default(4 * 60 * 60),
   MAX_DIMENSION_PX: z.coerce.number().default(8192),

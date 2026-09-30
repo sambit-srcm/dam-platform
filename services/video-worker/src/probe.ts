@@ -4,8 +4,6 @@ import { config } from './config.ts';
 import { UnprocessableMediaError } from './lib/errors.ts';
 import { ExecError, run } from './lib/exec.ts';
 
-const PROBE_TIMEOUT_MS = 60_000;
-
 const streamSchema = z.object({
   codec_type: z.string().optional(),
   codec_name: z.string().optional(),
@@ -53,7 +51,7 @@ export async function probeVideo(path: string): Promise<VideoMetadata> {
         '-show_streams',
         path,
       ],
-      { timeoutMs: PROBE_TIMEOUT_MS },
+      { timeoutMs: config.PROBE_TIMEOUT_MS },
     ));
   } catch (error) {
     // A timeout may pass on a retry; a file ffprobe rejects never will

@@ -17,8 +17,6 @@ import {
   updateAssetThumbnail,
 } from './repository.ts';
 
-const FRAME_TIMEOUT_MS = 60_000;
-
 export async function processThumbnail(ctx: Context, assetId: string) {
   const asset = await findAssetById(ctx.db, assetId);
   if (!asset) {
@@ -137,7 +135,7 @@ async function extractFrame(source: string, output: string) {
         '-y',
         output,
       ],
-      { timeoutMs: FRAME_TIMEOUT_MS },
+      { timeoutMs: config.FRAME_TIMEOUT_MS },
     );
     // A seek past the end makes ffmpeg exit cleanly without writing a file
     if (
