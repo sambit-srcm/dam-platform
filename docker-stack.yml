@@ -34,7 +34,10 @@ services:
         '${REDIS_PASSWORD:?set in .env}',
       ]
     ports:
-      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+      - target: 6379
+        published: 6379
+        protocol: tcp
+        mode: host
     volumes:
       - redis-data:/data
     deploy:
@@ -88,8 +91,14 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?set in .env}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
     ports:
-      - '127.0.0.1:${RABBITMQ_PORT:-5672}:5672'
-      - '127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+      - target: 5672
+        published: 5672
+        protocol: tcp
+        mode: host
+      - target: 15672
+        published: 15672
+        protocol: tcp
+        mode: host
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     deploy:
@@ -134,6 +143,14 @@ services:
       DB_POOL_MAX: 3
     deploy:
       replicas: 1
+      # Sized with IMAGE_MAX_REPLICAS on the autoscaler: 2 x 512M must fit beside everything else
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
       restart_policy:
         condition: on-failure
 
@@ -143,14 +160,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AMQP_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
       MINIO_ENDPOINT: minio
-      # Sized with IMAGE_MAX_REPLICAS on the autoscaler: 2 x 512M must fit beside everything else
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
       MINIO_API_PORT: 9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -158,15 +167,6 @@ services:
       DB_POOL_MAX: 3
     deploy:
       replicas: 1
-      restart_policy:
-        condition: on-failure
-
-  web:
-    image: dam-web:local
-    ports:
-      - target: 80
-        published: 8080
-        protocol: tcp
       # Sized with VIDEO_MAX_REPLICAS on the autoscaler: 2 x 1G must fit beside everything else.
       # One CPU matches the default FFMPEG_THREADS of 2 without starving the API.
       resources:
@@ -176,6 +176,15 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+      restart_policy:
+        condition: on-failure
+
+  web:
+    image: dam-web:local
+    ports:
+      - target: 80
+        published: 8080
+        protocol: tcp
         mode: host
     deploy:
       replicas: 1
