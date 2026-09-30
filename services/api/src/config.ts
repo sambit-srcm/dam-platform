@@ -28,7 +28,8 @@ const schema = z.object({
     .default('http://localhost:5173,http://localhost:8080'),
 
   // Ceiling for a resumable multipart upload
-  MAX_UPLOAD_GB: z.coerce.number().default(5),
+  // The web client has its own copy in features/assets/api.ts; keep the two equal
+  MAX_UPLOAD_MB: z.coerce.number().int().positive().default(300),
   UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
   PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
   UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept

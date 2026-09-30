@@ -44,7 +44,9 @@ export async function getDownloadUrl(id: string): Promise<string> {
   return res.data.url;
 }
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+// Must match MAX_UPLOAD_MB on the API
+export const MAX_UPLOAD_MB = 300;
+export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 const PART_URL_BATCH_SIZE = 10;
 const PART_CONCURRENCY = 3;

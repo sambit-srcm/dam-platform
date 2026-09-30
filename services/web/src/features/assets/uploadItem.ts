@@ -1,4 +1,4 @@
-import { MAX_UPLOAD_BYTES } from './api';
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './api';
 
 export type UploadItem = {
   id: string;
@@ -15,6 +15,8 @@ export function toUploadItem(file: File): UploadItem {
     file,
     state: tooBig ? 'error' : 'queued',
     progress: 0,
-    error: tooBig ? 'Larger than the 5 GB upload limit' : undefined,
+    error: tooBig
+      ? `Larger than the ${MAX_UPLOAD_MB} MB upload limit`
+      : undefined,
   };
 }
