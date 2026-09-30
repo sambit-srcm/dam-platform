@@ -7,14 +7,13 @@ import {
 import type { AdminAsset } from '../features/admin/types';
 import { AssetFilterBar } from '../features/assets/AssetFilterBar';
 import { AssetViewer } from '../features/assets/AssetViewer';
+import { PAGE_SIZE } from '../features/assets/constants';
 import { Pager } from '../features/assets/Pager';
 import { TagList } from '../features/assets/TagList';
 import type { AssetStatus } from '../features/assets/types';
 import { useAssetQuery } from '../features/assets/useAssetQuery';
 import { useAssetSearch } from '../features/assets/useAssetSearch';
 import { formatDate, formatSize } from '../lib/format';
-
-const PAGE_SIZE = 24;
 
 const isPending = (asset: AdminAsset) =>
   asset.status !== 'ready' && asset.status !== 'failed';

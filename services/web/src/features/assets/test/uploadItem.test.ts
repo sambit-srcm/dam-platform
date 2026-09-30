@@ -20,7 +20,7 @@ describe('turning a chosen file into an upload row', () => {
     Object.defineProperty(huge, 'size', { value: MAX_UPLOAD_BYTES + 1 });
     const row = toUploadItem(huge);
     expect(row.state).toBe('error');
-    expect(row.error).toContain('5 GB');
+    expect(row.error).toContain('300 MB');
   });
 
   it('accepts a file exactly at the limit', () => {

@@ -140,6 +140,9 @@ importers:
 
   services/autoscaler:
     dependencies:
+      '@dam/queue':
+        specifier: workspace:*
+        version: link:../../packages/queue
       pino:
         specifier: ^10.3.1
         version: 10.3.1

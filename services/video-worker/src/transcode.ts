@@ -2,12 +2,13 @@ import { config } from './config.ts';
 import { run } from './lib/exec.ts';
 import type { Rung } from './ladder.ts';
 
-const MIN_TIMEOUT_MS = 10 * 60_000;
-
 // Roughly four times the video's length, with more room for the bigger picture
 function timeoutFor(durationSeconds: number, rung: Rung) {
   const sizeFactor = rung.height >= 1080 ? 2 : 1;
-  return Math.max(MIN_TIMEOUT_MS, durationSeconds * 4000 * sizeFactor);
+  return Math.max(
+    config.TRANSCODE_MIN_TIMEOUT_MS,
+    durationSeconds * 4000 * sizeFactor,
+  );
 }
 
 export async function transcodeRung({

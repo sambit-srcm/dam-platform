@@ -15,6 +15,8 @@ const schema = z.object({
 
   // How long a single readiness check may take before it counts as down
   HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),
+  // Must stay below the orchestrator's stop grace period, or the process is killed mid-drain
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().default(10_000),
 
   MINIO_PUBLIC_URL: z.string().default('http://localhost:9000'),
   PRESIGNED_TTL_SECONDS: z.coerce.number().default(60 * 15), // 15 minutes
@@ -26,7 +28,8 @@ const schema = z.object({
     .default('http://localhost:5173,http://localhost:8080'),
 
   // Ceiling for a resumable multipart upload
-  MAX_UPLOAD_GB: z.coerce.number().default(5),
+  // The web client has its own copy in features/assets/api.ts; keep the two equal
+  MAX_UPLOAD_MB: z.coerce.number().int().positive().default(300),
   UPLOAD_SESSION_TTL_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
   PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
   UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept

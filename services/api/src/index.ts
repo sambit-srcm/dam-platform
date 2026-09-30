@@ -1,8 +1,13 @@
+import { runMigrations } from '@dam/db';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { startUploadCleanup } from './modules/uploads/upload.cleanup.ts';
 import { createContext } from './shared/lib/context.ts';
 import { logger } from './shared/lib/logger.ts';
+
+// Before anything touches the database, so a new deploy never runs on an old schema
+await runMigrations(config.DATABASE_URL);
+logger.info('database migrations up to date');
 
 const ctx = await createContext();
 const server = createApp(ctx).listen(config.PORT, () => {
@@ -10,9 +15,6 @@ const server = createApp(ctx).listen(config.PORT, () => {
 });
 
 const stopUploadCleanup = startUploadCleanup(ctx);
-
-// Give in-flight requests this long to finish before the process exits anyway
-const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 let shuttingDown = false;
 
@@ -29,9 +31,12 @@ function shutdown(signal: string) {
   server.closeIdleConnections();
 
   const forceExit = setTimeout(() => {
-    logger.warn({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'shutdown timed out');
+    logger.warn(
+      { timeoutMs: config.SHUTDOWN_TIMEOUT_MS },
+      'shutdown timed out',
+    );
     process.exit(1);
-  }, SHUTDOWN_TIMEOUT_MS);
+  }, config.SHUTDOWN_TIMEOUT_MS);
   forceExit.unref();
 
   server.close(async () => {

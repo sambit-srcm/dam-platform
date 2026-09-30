@@ -1,0 +1,908 @@
+openapi: 3.1.0
+info:
+  title: DAM Platform API
+  version: 0.1.0
+  description: |
+    REST API of the DAM platform: accounts, asset browsing, direct-to-storage
+    multipart uploads, and admin reporting.
+
+    **Base URL.** Through the web container's nginx the API lives under `/api`
+    (`http://localhost:8080/api`), and nginx strips that prefix. The API
+    container also publishes port 3000 directly. Paths below have no prefix.
+
+    **Authentication.** Everything except `/health/*` and `/auth/register`,
+    `/auth/login` needs `Authorization: Bearer <token>`, with a token from
+    register or login.
+
+    **Ownership.** A user only sees their own assets. Someone else's asset
+    answers `404`, exactly like a missing one, so ids cannot be probed.
+    Admins use the `/admin` routes to see every asset.
+
+    **Errors.** Every failure uses the same envelope, see `Error`. The
+    `requestId` matches the request log line.
+
+    **Uploads.** Files never pass through the API. The client cuts the file
+    into parts, asks the API for presigned URLs, `PUT`s each part straight to
+    object storage, and then completes the upload. See the `Uploads` tag.
+servers:
+  - url: http://localhost:8080/api
+    description: Through the web container (nginx strips /api)
+  - url: http://localhost:3000
+    description: API container directly
+tags:
+  - name: Health
+    description: Probes. No login needed.
+  - name: Auth
+    description: Accounts and tokens.
+  - name: Assets
+    description: Browse, view and download your own assets.
+  - name: Uploads
+    description: Resumable multipart upload straight to object storage.
+  - name: Admin
+    description: Read-only reporting across all users. Needs the admin role.
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: health
+      tags: [Health]
+      summary: Liveness shortcut
+      security: []
+      responses:
+        '200':
+          description: The process answers.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+  /health/live:
+    get:
+      operationId: healthLive
+      tags: [Health]
+      summary: Is the process alive
+      description: Used for restarts. Never touches other services.
+      security: []
+      responses:
+        '200':
+          description: Alive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, uptimeSeconds]
+                properties:
+                  status: { type: string, const: ok }
+                  uptimeSeconds: { type: integer }
+  /health/ready:
+    get:
+      operationId: healthReady
+      tags: [Health]
+      summary: Can the API reach everything it needs
+      description: |
+        Checks Postgres, Redis, MinIO (bucket exists) and RabbitMQ, each with a
+        timeout. Error details stay in the log and are not returned.
+      security: []
+      responses:
+        '200':
+          description: Every dependency is up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        '503':
+          description: At least one dependency is down.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+  /auth/register:
+    post:
+      operationId: register
+      tags: [Auth]
+      summary: Create an account
+      description: New accounts always get the `user` role.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created and signed in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: An account with this email already exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResult'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401':
+          description: Wrong email or password. Both cases look the same.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [Auth]
+      summary: The signed-in user
+      responses:
+        '200':
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: The account no longer exists.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /assets:
+    get:
+      operationId: listAssets
+      tags: [Assets]
+      summary: List your assets
+      description: Newest first. Filters combine, and `tags` must all match.
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: One page of assets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, limit, offset]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AssetSummary' }
+                  total:
+                    { type: integer, description: Matches across all pages }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /assets/tags:
+    get:
+      operationId: listTags
+      tags: [Assets]
+      summary: Your most used tags
+      description: Up to 100 tags, most used first.
+      responses:
+        '200':
+          description: Tags with how many of your assets carry them.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TagList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /assets/{assetId}:
+    get:
+      operationId: getAsset
+      tags: [Assets]
+      summary: One asset
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: The asset.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/{assetId}/view:
+    get:
+      operationId: getAssetView
+      tags: [Assets]
+      summary: Links to show the asset in the browser
+      description: |
+        Short-lived presigned links that open inline. Does not count as a
+        download. Videos return one link per rendition (for example `1080p`,
+        `720p`), or the original file while none exist.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Where to load the asset from.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssetView' }
+        '400':
+          description: The asset has no file yet (still uploading, or failed), or the id is malformed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/{assetId}/download:
+    post:
+      operationId: downloadAsset
+      tags: [Assets]
+      summary: Get a download link for the original file
+      description: |
+        Counts as a download (database counter and the daily Redis statistic).
+        The link forces a browser download with the original filename.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: A presigned link, valid for 15 minutes by default.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        '400':
+          description: The asset has no file to download yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/uploads:
+    post:
+      operationId: startUpload
+      tags: [Uploads]
+      summary: Start an upload
+      description: |
+        Declares the file and opens a multipart upload in object storage. The
+        asset is created with status `uploading`. The returned plan says how to
+        cut the file: every part is `partSize` bytes except the last.
+
+        Supported types are `image/*`, `video/*` and `application/pdf`. Files
+        above the configured limit (300 MB by default) are refused. The upload
+        stays open for one hour, after which a sweeper aborts it and marks the
+        asset `failed` with `upload_expired`.
+
+        Refused with `503` while the job queue is down for types that need
+        processing, so a file is never accepted that could not be processed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StartUploadRequest' }
+      responses:
+        '201':
+          description: Upload opened.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadPlan' }
+        '400':
+          description: Bad body, unsupported type, or file above the size limit.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /assets/uploads/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/AssetId'
+    get:
+      operationId: getUploadStatus
+      tags: [Uploads]
+      summary: Which parts have arrived
+      description: |
+        Used to resume after a failure. Object storage is the authority for
+        `received` and `remaining`; send only the remaining parts, then complete.
+      responses:
+        '200':
+          description: Progress of the open upload.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadStatus' }
+        '400': { $ref: '#/components/responses/UploadClosed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: abortUpload
+      tags: [Uploads]
+      summary: Cancel an upload
+      description: Aborts the multipart upload and marks the asset `failed` with `cancelled_by_user`.
+      responses:
+        '204': { description: Cancelled. }
+        '400': { $ref: '#/components/responses/UploadClosed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/uploads/{assetId}/parts:
+    post:
+      operationId: signUploadParts
+      tags: [Uploads]
+      summary: Get presigned URLs for parts
+      description: |
+        At most 10 links are returned per call (extra numbers are ignored), so
+        ask in batches. The client then does `PUT <url>` with the part bytes
+        straight to object storage and keeps the `ETag` response header.
+        Links expire after 15 minutes by default.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [partNumbers]
+              properties:
+                partNumbers:
+                  type: array
+                  minItems: 1
+                  items: { type: integer, minimum: 1 }
+                  description: Numbers start at 1 and must not exceed `partCount`.
+      responses:
+        '200':
+          description: Signed links, one per requested part.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [parts]
+                properties:
+                  parts:
+                    type: array
+                    items:
+                      type: object
+                      required: [partNumber, url]
+                      properties:
+                        partNumber: { type: integer }
+                        url: { type: string, format: uri }
+        '400':
+          description: Bad body, a part number beyond `partCount`, or the upload is closed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/uploads/{assetId}/parts/recorded:
+    post:
+      operationId: recordUploadedPart
+      tags: [Uploads]
+      summary: Report a part the client sent
+      description: |
+        Progress bookkeeping only (kept in Redis until the upload ends). It is
+        not trusted: completion checks object storage, not this list.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordedPart' }
+      responses:
+        '204': { description: Recorded. }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /assets/uploads/{assetId}/complete:
+    post:
+      operationId: completeUpload
+      tags: [Uploads]
+      summary: Finish the upload
+      description: |
+        Checks storage for the right number of parts and total size, completes
+        the multipart upload, then queues processing. Images and videos become
+        `uploaded` and are picked up by the workers; PDFs go straight to `ready`.
+
+        If the parts do not match what was declared, the upload is aborted and
+        the asset is marked `failed` (`uploaded_bytes_did_not_match_declared_size`).
+        If processing cannot be queued the asset is marked `failed`
+        (`queue_unavailable`) and the call answers `503`.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: The finished asset.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Asset' }
+        '400':
+          description: The upload is closed, or the uploaded file does not match what was declared.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /admin/dashboard:
+    get:
+      operationId: adminDashboard
+      tags: [Admin]
+      summary: Totals and daily activity
+      parameters:
+        - name: days
+          in: query
+          description: How many UTC days to report, ending today.
+          schema: { type: integer, minimum: 1, maximum: 90, default: 14 }
+      responses:
+        '200':
+          description: Dashboard numbers.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/assets:
+    get:
+      operationId: adminListAssets
+      tags: [Admin]
+      summary: List every user's assets
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/Kind'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Sort'
+        - name: ownerId
+          in: query
+          description: Only assets of this user.
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: One page of assets.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, limit, offset]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/AdminAssetSummary' }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/assets/{assetId}:
+    get:
+      operationId: adminGetAsset
+      tags: [Admin]
+      summary: One asset with its details
+      description: Includes the failure reason, worker metadata and viewing links. Does not count as a download.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: The asset.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAsset' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/tags:
+    get:
+      operationId: adminListTags
+      tags: [Admin]
+      summary: Most used tags across all users
+      responses:
+        '200':
+          description: Up to 100 tags.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TagList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: HS256 token from register or login. Expires after one hour by default.
+  parameters:
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Q:
+      name: q
+      in: query
+      description: Part of the file name, or a tag.
+      schema: { type: string, minLength: 1, maxLength: 100 }
+    Kind:
+      name: type
+      in: query
+      schema: { type: string, enum: [image, video, document] }
+    Tags:
+      name: tags
+      in: query
+      description: Comma separated, at most 10. An asset must carry all of them.
+      schema: { type: string, example: 'beach,2026' }
+    Status:
+      name: status
+      in: query
+      schema: { $ref: '#/components/schemas/AssetStatus' }
+    From:
+      name: from
+      in: query
+      description: First day included, as `YYYY-MM-DD` (UTC). Must not be after `to`.
+      schema: { type: string, format: date }
+    To:
+      name: to
+      in: query
+      description: Last day included, as `YYYY-MM-DD` (UTC).
+      schema: { type: string, format: date }
+    Sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [createdAt, downloadCount]
+        default: createdAt
+  responses:
+    ValidationError:
+      description: The request did not pass validation. The message lists each field.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Missing, invalid or expired token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The signed-in user is not an admin.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: No such resource, or it belongs to someone else.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UploadClosed:
+      description: The id is malformed, or the upload is no longer in progress (finished, cancelled, failed or expired).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unavailable:
+      description: The job queue is down. Retry shortly.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              enum:
+                - validation_error
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - service_unavailable
+                - internal_error
+            message: { type: string }
+            requestId: { type: string }
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        checks:
+          type: object
+          required: [postgres, redis, minio, rabbitmq]
+          additionalProperties: false
+          properties:
+            postgres: { $ref: '#/components/schemas/CheckStatus' }
+            redis: { $ref: '#/components/schemas/CheckStatus' }
+            minio: { $ref: '#/components/schemas/CheckStatus' }
+            rabbitmq: { $ref: '#/components/schemas/CheckStatus' }
+    CheckStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [up, down] }
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, description: Stored lowercased. }
+        password: { type: string, minLength: 8, maxLength: 128 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1, maxLength: 128 }
+    User:
+      type: object
+      required: [id, email, role, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+        createdAt: { type: string, format: date-time }
+    AuthResult:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    AssetStatus:
+      type: string
+      description: |
+        `uploading` parts are still being sent; `uploaded` the file is stored
+        and waiting for a worker; `processing` a worker has it; `ready` done;
+        `failed` see `failureReason`.
+      enum: [uploading, uploaded, processing, ready, failed]
+    VideoMetadata:
+      type: object
+      required: [durationSeconds, width, height, videoCodec, audioCodec]
+      properties:
+        durationSeconds: { type: number }
+        width: { type: integer }
+        height: { type: integer }
+        videoCodec: { type: string }
+        audioCodec: { type: [string, 'null'] }
+    ImageMetadata:
+      type: object
+      required: [width, height, format]
+      properties:
+        width: { type: integer }
+        height: { type: integer }
+        format: { type: string }
+    AssetSummary:
+      type: object
+      required:
+        [
+          id,
+          filename,
+          mimeType,
+          sizeBytes,
+          status,
+          tags,
+          createdAt,
+          thumbnailUrl,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        filename: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/AssetStatus' }
+        tags: { type: array, items: { type: string } }
+        createdAt: { type: string, format: date-time }
+        thumbnailUrl:
+          type: [string, 'null']
+          format: uri
+          description: Presigned link, null until a thumbnail exists.
+    Asset:
+      allOf:
+        - $ref: '#/components/schemas/AssetSummary'
+        - type: object
+          required: [ownerId, failureReason, updatedAt]
+          properties:
+            ownerId: { type: [string, 'null'], format: uuid }
+            failureReason:
+              type: [string, 'null']
+              description: |
+                Set when `status` is `failed`, for example `upload_expired`,
+                `cancelled_by_user`, `cancelled_by_admin`, `queue_unavailable`,
+                `uploaded_bytes_did_not_match_declared_size`, `processing_failed`.
+            updatedAt: { type: string, format: date-time }
+    AdminAssetSummary:
+      allOf:
+        - $ref: '#/components/schemas/AssetSummary'
+        - type: object
+          required: [ownerId, ownerEmail, downloadCount]
+          properties:
+            ownerId: { type: [string, 'null'], format: uuid }
+            ownerEmail: { type: [string, 'null'], format: email }
+            downloadCount: { type: integer }
+    AdminAsset:
+      allOf:
+        - $ref: '#/components/schemas/AdminAssetSummary'
+        - type: object
+          required: [failureReason, metadata, updatedAt, view]
+          properties:
+            failureReason: { type: [string, 'null'] }
+            metadata:
+              description: Filled in by the workers. Null for documents and before processing.
+              oneOf:
+                - $ref: '#/components/schemas/VideoMetadata'
+                - $ref: '#/components/schemas/ImageMetadata'
+                - type: 'null'
+            updatedAt: { type: string, format: date-time }
+            view:
+              description: Null while the asset has no file.
+              oneOf:
+                - $ref: '#/components/schemas/AssetView'
+                - type: 'null'
+    AssetView:
+      oneOf:
+        - type: object
+          required: [kind, renditions]
+          properties:
+            kind: { type: string, const: video }
+            renditions:
+              type: array
+              items:
+                type: object
+                required: [label, width, height, url]
+                properties:
+                  label: { type: string, examples: ['1080p', '720p', original] }
+                  width: { type: [integer, 'null'] }
+                  height: { type: [integer, 'null'] }
+                  url: { type: string, format: uri }
+        - type: object
+          required: [kind, url]
+          properties:
+            kind: { type: string, enum: [image, document] }
+            url: { type: string, format: uri }
+    TagList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [tag, count]
+            properties:
+              tag: { type: string }
+              count: { type: integer }
+    StartUploadRequest:
+      type: object
+      required: [filename, mimeType, size]
+      properties:
+        filename: { type: string, minLength: 1, maxLength: 255 }
+        mimeType:
+          type: string
+          description: '`image/*`, `video/*` or `application/pdf`.'
+        size:
+          type: integer
+          minimum: 1
+          description: Exact size in bytes. Completion fails if the uploaded total differs.
+    UploadPlan:
+      type: object
+      required: [assetId, partSize, partCount]
+      properties:
+        assetId: { type: string, format: uuid }
+        partSize:
+          type: integer
+          description: Bytes per part, at least 5 MiB except for single-part files. The last part may be smaller.
+        partCount: { type: integer, maximum: 10000 }
+    UploadStatus:
+      type: object
+      required: [partSize, partCount, received, remaining, recorded]
+      properties:
+        partSize: { type: integer }
+        partCount: { type: integer }
+        received:
+          type: array
+          items: { type: integer }
+          description: Parts that object storage actually holds.
+        remaining:
+          type: array
+          items: { type: integer }
+          description: Parts still to send.
+        recorded:
+          type: array
+          description: What the client reported, for progress display only.
+          items: { $ref: '#/components/schemas/RecordedPart' }
+    RecordedPart:
+      type: object
+      required: [partNumber, etag, size]
+      properties:
+        partNumber: { type: integer, minimum: 1 }
+        etag: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+    Dashboard:
+      type: object
+      required: [totals, byStatus, byType, days, latest, topDownloaded]
+      properties:
+        totals:
+          type: object
+          required: [assets, storageBytes, downloads, users]
+          properties:
+            assets: { type: integer }
+            storageBytes:
+              {
+                type: integer,
+                description: Only assets that have a stored file.,
+              }
+            downloads: { type: integer }
+            users: { type: integer }
+        byStatus:
+          type: object
+          description: Asset count per status. Statuses with no assets are absent.
+          additionalProperties: { type: integer }
+        byType:
+          type: object
+          description: Asset count per kind of file.
+          additionalProperties: { type: integer }
+        days:
+          type: array
+          description: One entry per UTC day, oldest first.
+          items:
+            type: object
+            required: [day, uploads, downloads]
+            properties:
+              day: { type: string, format: date }
+              uploads: { type: integer }
+              downloads:
+                type: [integer, 'null']
+                description: Null when Redis could not be read, so it is not mistaken for zero.
+        latest:
+          type: array
+          description: The five newest ready assets.
+          items: { $ref: '#/components/schemas/AdminAssetSummary' }
+        topDownloaded:
+          type: array
+          items:
+            type: object
+            required:
+              [id, filename, mimeType, downloadCount, ownerEmail, thumbnailUrl]
+            properties:
+              id: { type: string, format: uuid }
+              filename: { type: string }
+              mimeType: { type: string }
+              downloadCount: { type: integer }
+              ownerEmail: { type: [string, 'null'], format: email }
+              thumbnailUrl: { type: [string, 'null'], format: uri }

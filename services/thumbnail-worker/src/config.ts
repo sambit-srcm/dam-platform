@@ -24,6 +24,14 @@ const schema = z.object({
   MINIO_ROOT_PASSWORD: z.string(),
   MINIO_BUCKET: z.string(),
   HEARTBEAT_FILE: z.string().default('/tmp/worker-alive'),
+  // The Dockerfile healthcheck wants the file touched within the last minute
+  HEARTBEAT_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(50_000)
+    .default(30_000),
+  FRAME_TIMEOUT_MS: z.coerce.number().default(60_000),
   // Width of the generated thumbnail, in pixels
   THUMBNAIL_WIDTH: z.coerce.number().default(400),
   // How many jobs this worker takes at a time

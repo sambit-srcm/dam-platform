@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { UploadItem } from '../../features/assets/uploadItem';
 import { UploadList } from '../UploadPage';
 
@@ -60,5 +60,26 @@ describe('upload list', () => {
     ]) {
       expect(html).toContain(colour);
     }
+  });
+});
+
+describe('retrying a failed upload', () => {
+  const failed = (assetId?: string) =>
+    item({ state: 'error', error: 'Network Error', assetId });
+  const retryable = (items: UploadItem[]) =>
+    renderToStaticMarkup(<UploadList items={items} onRetry={vi.fn()} />);
+
+  it('offers Retry when the API had opened the upload', () => {
+    expect(retryable([failed('a1')])).toContain('Retry');
+  });
+
+  it('offers no Retry when the upload never started on the API', () => {
+    expect(retryable([failed()])).not.toContain('Retry');
+  });
+
+  it('offers no Retry while other uploads are running', () => {
+    expect(
+      renderToStaticMarkup(<UploadList items={[failed('a1')]} />),
+    ).not.toContain('Retry');
   });
 });

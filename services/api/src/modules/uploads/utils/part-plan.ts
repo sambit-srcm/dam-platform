@@ -21,10 +21,10 @@ export function planParts(declaredSize: number): PartPlan {
     );
   }
 
-  const maxBytes = config.MAX_UPLOAD_GB * 1024 * MIB;
+  const maxBytes = config.MAX_UPLOAD_MB * MIB;
   if (declaredSize > maxBytes) {
     throw new ValidationError(
-      `Files larger than ${config.MAX_UPLOAD_GB} GB are not accepted`,
+      `Files larger than ${config.MAX_UPLOAD_MB} MB are not accepted`,
     );
   }
 

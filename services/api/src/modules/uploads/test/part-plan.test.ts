@@ -3,7 +3,6 @@ import { ValidationError } from '../../../shared/errors/AppError.ts';
 import { planParts } from '../utils/part-plan.ts';
 
 const MIB = 1024 * 1024;
-const GIB = 1024 * MIB;
 
 describe('cutting a file into upload parts', () => {
   it('sends a small file in one piece', () => {
@@ -23,14 +22,11 @@ describe('cutting a file into upload parts', () => {
   });
 
   it('keeps 5 MB parts all the way up to the biggest allowed file', () => {
-    const { partSize, partCount } = planParts(5 * GIB);
-    expect(partSize).toBe(5 * MIB);
-    expect(partCount).toBe(1024);
-    expect(partCount).toBeLessThanOrEqual(10_000);
+    expect(planParts(300 * MIB)).toEqual({ partSize: 5 * MIB, partCount: 60 });
   });
 
   it('always covers the whole file', () => {
-    for (const size of [1, 5 * MIB + 1, 123 * MIB + 7, 4 * GIB + 3]) {
+    for (const size of [1, 5 * MIB + 1, 123 * MIB + 7, 300 * MIB - 3]) {
       const { partSize, partCount } = planParts(size);
       expect(partSize * partCount).toBeGreaterThanOrEqual(size);
       expect(partSize * (partCount - 1)).toBeLessThan(size);
@@ -41,7 +37,7 @@ describe('cutting a file into upload parts', () => {
     expect(() => planParts(size)).toThrow(ValidationError);
   });
 
-  it('refuses a file over the 5 GB limit', () => {
-    expect(() => planParts(5 * GIB + 1)).toThrow(/larger than 5 GB/);
+  it('refuses a file over the 300 MB limit', () => {
+    expect(() => planParts(300 * MIB + 1)).toThrow(/larger than 300 MB/);
   });
 });

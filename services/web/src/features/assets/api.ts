@@ -8,6 +8,7 @@ import type {
   TagCount,
   UploadedAsset,
   UploadSession,
+  UploadStatus,
 } from './types';
 
 // The API wants tags as one comma separated value, and no empty parameters
@@ -44,7 +45,9 @@ export async function getDownloadUrl(id: string): Promise<string> {
   return res.data.url;
 }
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
+// Must match MAX_UPLOAD_MB on the API
+export const MAX_UPLOAD_MB = 300;
+export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 const PART_URL_BATCH_SIZE = 10;
 const PART_CONCURRENCY = 3;
@@ -70,59 +73,114 @@ async function putPart(
   }
 }
 
-// The file goes straight to storage in parts; the API only plans, signs and finalises
+type SendPartsInput = {
+  file: File;
+  assetId: string;
+  partSize: number;
+  partCount: number;
+  partNumbers: number[];
+  alreadyReceived?: number[];
+  onProgress?: (percent: number) => void;
+};
+
+// Sends the given parts straight to storage, a batch of links at a time and a few in parallel
+async function sendParts({
+  file,
+  assetId,
+  partSize,
+  partCount,
+  partNumbers,
+  alreadyReceived = [],
+  onProgress,
+}: SendPartsInput) {
+  const sizeOfPart = (partNumber: number) => {
+    const start = (partNumber - 1) * partSize;
+    return Math.min(start + partSize, file.size) - start;
+  };
+
+  const loadedByPart = new Array<number>(partCount + 1).fill(0);
+  for (const partNumber of alreadyReceived) {
+    loadedByPart[partNumber] = sizeOfPart(partNumber);
+  }
+  const report = () => {
+    const loaded = loadedByPart.reduce((sum, bytes) => sum + bytes, 0);
+    onProgress?.(Math.min(100, Math.round((loaded / file.size) * 100)));
+  };
+  report();
+
+  for (let i = 0; i < partNumbers.length; i += PART_URL_BATCH_SIZE) {
+    const { data } = await http.post<{ parts: SignedPart[] }>(
+      `/assets/uploads/${assetId}/parts`,
+      { partNumbers: partNumbers.slice(i, i + PART_URL_BATCH_SIZE) },
+    );
+
+    const queue = [...data.parts];
+    const worker = async () => {
+      for (let part = queue.shift(); part; part = queue.shift()) {
+        const start = (part.partNumber - 1) * partSize;
+        const chunk = file.slice(start, start + sizeOfPart(part.partNumber));
+        await putPart(part.url, chunk, (loaded) => {
+          loadedByPart[part.partNumber] = loaded;
+          report();
+        });
+        loadedByPart[part.partNumber] = chunk.size;
+        report();
+      }
+    };
+    await Promise.all(Array.from({ length: PART_CONCURRENCY }, () => worker()));
+  }
+}
+
+async function completeUpload(assetId: string) {
+  const { data } = await http.post<UploadedAsset>(
+    `/assets/uploads/${assetId}/complete`,
+  );
+  return data;
+}
+
+// The file goes straight to storage in parts; the API only plans, signs and finalises.
+// A failure leaves the upload open, so resumeUpload can finish it until it expires.
 export async function uploadAsset(
   file: File,
   onProgress?: (percent: number) => void,
+  onStart?: (assetId: string) => void,
 ): Promise<UploadedAsset> {
   const { data: session } = await http.post<UploadSession>('/assets/uploads', {
     filename: file.name,
     mimeType: file.type,
     size: file.size,
   });
-  const { assetId, partSize, partCount } = session;
-  const base = `/assets/uploads/${assetId}`;
+  onStart?.(session.assetId);
 
-  const loadedByPart = new Array<number>(partCount + 1).fill(0);
-  const report = () => {
-    const loaded = loadedByPart.reduce((sum, bytes) => sum + bytes, 0);
-    onProgress?.(Math.min(100, Math.round((loaded / file.size) * 100)));
-  };
+  await sendParts({
+    file,
+    assetId: session.assetId,
+    partSize: session.partSize,
+    partCount: session.partCount,
+    partNumbers: Array.from({ length: session.partCount }, (_, i) => i + 1),
+    onProgress,
+  });
+  return completeUpload(session.assetId);
+}
 
-  try {
-    const partNumbers = Array.from({ length: partCount }, (_, i) => i + 1);
+// Asks storage which parts already arrived and sends only the rest
+export async function resumeUpload(
+  assetId: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<UploadedAsset> {
+  const { data: status } = await http.get<UploadStatus>(
+    `/assets/uploads/${assetId}`,
+  );
 
-    for (let i = 0; i < partNumbers.length; i += PART_URL_BATCH_SIZE) {
-      const { data } = await http.post<{ parts: SignedPart[] }>(
-        `${base}/parts`,
-        { partNumbers: partNumbers.slice(i, i + PART_URL_BATCH_SIZE) },
-      );
-
-      const queue = [...data.parts];
-      const worker = async () => {
-        for (let part = queue.shift(); part; part = queue.shift()) {
-          const start = (part.partNumber - 1) * partSize;
-          const chunk = file.slice(
-            start,
-            Math.min(start + partSize, file.size),
-          );
-          await putPart(part.url, chunk, (loaded) => {
-            loadedByPart[part.partNumber] = loaded;
-            report();
-          });
-          loadedByPart[part.partNumber] = chunk.size;
-          report();
-        }
-      };
-      await Promise.all(
-        Array.from({ length: PART_CONCURRENCY }, () => worker()),
-      );
-    }
-
-    const { data: asset } = await http.post<UploadedAsset>(`${base}/complete`);
-    return asset;
-  } catch (error) {
-    await http.delete(base).catch(() => undefined);
-    throw error;
-  }
+  await sendParts({
+    file,
+    assetId,
+    partSize: status.partSize,
+    partCount: status.partCount,
+    partNumbers: status.remaining,
+    alreadyReceived: status.received,
+    onProgress,
+  });
+  return completeUpload(assetId);
 }

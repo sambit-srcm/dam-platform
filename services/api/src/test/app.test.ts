@@ -82,4 +82,11 @@ describe('public routes', () => {
 
     expect(res.status).toBe(200);
   });
+
+  it('serve the API spec without a token', async () => {
+    const res = await call('/docs/openapi.yaml');
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('openapi: 3.1');
+  });
 });

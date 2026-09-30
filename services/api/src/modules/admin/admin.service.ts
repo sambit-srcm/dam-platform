@@ -17,8 +17,7 @@ import {
   uploadsPerDay,
 } from './admin.repository.ts';
 import type { DashboardQuery, ListAdminAssetsQuery } from './admin.schema.ts';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+import { ONE_DAY_MS } from '../../shared/lib/time.ts';
 
 // No download link here, so browsing never skips the download counter
 async function presentAdminAsset(
