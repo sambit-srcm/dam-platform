@@ -1,0 +1,9 @@
+pnpm format:check
+pnpm lint
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact --verbose
+else
+  echo "gitleaks is not installed, so staged changes were not scanned for secrets." >&2
+  echo "Install it with: brew install gitleaks" >&2
+fi
