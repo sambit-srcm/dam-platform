@@ -19,14 +19,12 @@ const schema = z.object({
   // Consecutive empty polls required before scaling down
   SCALE_DOWN_COOLDOWN_POLLS: z.coerce.number().default(3),
 
-  IMAGE_QUEUE: z.string().default('dam.thumbnail-generation'),
   IMAGE_SERVICE: z.string().default('thumbnail-worker'),
   IMAGE_MIN_REPLICAS: z.coerce.number().default(1),
   IMAGE_MAX_REPLICAS: z.coerce.number().default(6),
   // Add one replica for every this-many messages waiting in the queue
   IMAGE_MESSAGES_PER_REPLICA: z.coerce.number().default(5),
 
-  VIDEO_QUEUE: z.string().default('dam.video-processing'),
   VIDEO_SERVICE: z.string().default('video-worker'),
   VIDEO_MIN_REPLICAS: z.coerce.number().default(1),
   VIDEO_MAX_REPLICAS: z.coerce.number().default(4),

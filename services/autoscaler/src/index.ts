@@ -1,3 +1,4 @@
+import { queues } from '@dam/queue';
 import { config } from './config.ts';
 import { logger } from './logger.ts';
 import { messagesReady } from './rabbitmq.ts';
@@ -5,17 +6,18 @@ import { getService, scaleService } from './docker.ts';
 import { decideReplicaCount, type ScalingRule } from './scaling.ts';
 
 // One entry per worker we're allowed to scale. Everything the loop needs
-// to know about that worker lives here, read straight from the config.
+// to know about that worker lives here. Queue names come from the shared
+// topology, so a renamed queue can't leave the autoscaler watching the old one.
 const rules: ScalingRule[] = [
   {
-    queueName: config.IMAGE_QUEUE,
+    queueName: queues['thumbnail.generate'].queue,
     serviceName: config.IMAGE_SERVICE,
     minReplicas: config.IMAGE_MIN_REPLICAS,
     maxReplicas: config.IMAGE_MAX_REPLICAS,
     messagesPerReplica: config.IMAGE_MESSAGES_PER_REPLICA,
   },
   {
-    queueName: config.VIDEO_QUEUE,
+    queueName: queues['video.process'].queue,
     serviceName: config.VIDEO_SERVICE,
     minReplicas: config.VIDEO_MIN_REPLICAS,
     maxReplicas: config.VIDEO_MAX_REPLICAS,
