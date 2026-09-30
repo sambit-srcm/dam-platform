@@ -4,6 +4,7 @@ import {
   CreateMultipartUploadCommand,
   HeadObjectCommand,
   ListPartsCommand,
+  type Part,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -11,10 +12,12 @@ import { publishJob } from '@dam/queue';
 import { config } from '../../config.ts';
 import {
   NotFoundError,
+  ServiceUnavailableError,
   ValidationError,
 } from '../../shared/errors/AppError.ts';
 import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
 import type { Context } from '../../shared/lib/context.ts';
+import { assertQueueAvailable } from '../../shared/lib/queue-check.ts';
 import { s3, s3Public } from '../../shared/lib/s3.ts';
 import {
   createAsset,
@@ -44,6 +47,8 @@ export async function startUpload(
   actor: AuthUser,
 ) {
   const kind = assetKindFor(input.mimeType); // rejects unsupported types before any S3 call
+  // A file that needs processing is useless if its job cannot be queued afterwards
+  if (jobTypesFor(kind).length > 0) await assertQueueAvailable(ctx.queue);
   const { partSize, partCount } = planParts(input.size);
   const storageKey = storageKeyFor(kind, input.filename);
 
@@ -116,22 +121,38 @@ export async function signParts(
   );
 }
 
+// Storage returns at most 1,000 parts per call, and a large file has more
+async function listStoredParts(
+  ctx: Context,
+  asset: { storageKey: string; upload: { uploadId: string } | null },
+) {
+  const parts: Part[] = [];
+  let marker: string | undefined;
+
+  do {
+    const page = await s3.send(
+      new ListPartsCommand({
+        Bucket: ctx.bucket,
+        Key: asset.storageKey,
+        UploadId: asset.upload!.uploadId,
+        PartNumberMarker: marker,
+      }),
+    );
+    parts.push(...(page.Parts ?? []));
+    marker = page.IsTruncated ? page.NextPartNumberMarker : undefined;
+  } while (marker);
+
+  return parts;
+}
+
 export async function uploadStatus(
   ctx: Context,
   assetId: string,
   actor: AuthUser,
 ) {
   const asset = await activeUpload(ctx, assetId, actor);
-  const listed = await s3.send(
-    new ListPartsCommand({
-      Bucket: ctx.bucket,
-      Key: asset.storageKey,
-      UploadId: asset.upload!.uploadId,
-    }),
-  );
-
   // Storage is the authority on what actually arrived
-  const received = (listed.Parts ?? [])
+  const received = (await listStoredParts(ctx, asset))
     .map((part) => part.PartNumber!)
     .sort((a, b) => a - b);
   const all = Array.from({ length: asset.upload!.partCount }, (_, i) => i + 1);
@@ -154,14 +175,7 @@ export async function finishUpload(
   const asset = await activeUpload(ctx, assetId, actor);
   const { uploadId, partSize, partCount } = asset.upload!;
 
-  const listed = await s3.send(
-    new ListPartsCommand({
-      Bucket: ctx.bucket,
-      Key: asset.storageKey,
-      UploadId: uploadId,
-    }),
-  );
-  const parts = (listed.Parts ?? []).sort(
+  const parts = (await listStoredParts(ctx, asset)).sort(
     (a, b) => a.PartNumber! - b.PartNumber!,
   );
 
@@ -217,7 +231,13 @@ export async function finishUpload(
       await publishJob(ctx.queue, jobType, { assetId });
     } catch (error) {
       // The first job finishes the asset; later ones (a video poster) are optional
-      if (index === 0) throw error;
+      if (index === 0) {
+        logger.error({ err: error, assetId, jobType }, 'failed to queue job');
+        await failAsset(ctx.db, assetId, 'queue_unavailable');
+        throw new ServiceUnavailableError(
+          'The file was received but could not be queued for processing, please upload it again',
+        );
+      }
       logger.warn({ err: error, assetId, jobType }, 'failed to queue job');
     }
   }

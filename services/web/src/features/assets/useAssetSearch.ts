@@ -1,10 +1,21 @@
 import { useEffect, useState } from 'react';
-import { getErrorMessage } from '../../lib/http';
+import { whenLoaded } from '../../lib/whenLoaded';
 import type { ListAssetsParams } from './types';
 
 type Page<T> = { items: T[]; total: number };
 
 const REFRESH_MS = 4000;
+
+// Results that arrive after isCancelled turns true are dropped, so a slow old search cannot overwrite a newer one
+export async function runSearch<T>(
+  fetchPage: (params: ListAssetsParams) => Promise<Page<T>>,
+  params: ListAssetsParams,
+  isCancelled: () => boolean,
+  onPage: (page: Page<T>) => void,
+  onError: (message: string) => void,
+) {
+  return whenLoaded(fetchPage(params), isCancelled, onPage, onError);
+}
 
 // Loads a list again whenever the params change, keeping the old list on screen meanwhile.
 // While isPending says some item is still in progress, it also reloads on a timer.
@@ -22,15 +33,15 @@ export function useAssetSearch<T>(
   useEffect(() => {
     let cancelled = false;
 
-    fetchPage(JSON.parse(key) as ListAssetsParams).then(
+    void runSearch(
+      fetchPage,
+      JSON.parse(key) as ListAssetsParams,
+      () => cancelled,
       (result) => {
-        if (cancelled) return;
         setPage(result);
         setError(null);
       },
-      (err: unknown) => {
-        if (!cancelled) setError(getErrorMessage(err));
-      },
+      setError,
     );
 
     return () => {

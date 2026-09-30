@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuthStore } from '../features/auth/store';
+import { navClass } from './navClass';
 
 type Health = 'checking' | 'connected' | 'unavailable';
 
@@ -10,11 +11,6 @@ const HEALTH_STYLES: Record<Health, string> = {
   connected: 'bg-green-100 text-green-700',
   unavailable: 'bg-red-100 text-red-700',
 };
-
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  `text-sm font-medium transition ${
-    isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-900'
-  }`;
 
 export function AppLayout() {
   const [health, setHealth] = useState<Health>('checking');

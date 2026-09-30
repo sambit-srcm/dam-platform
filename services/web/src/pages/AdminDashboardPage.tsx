@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getDashboard } from '../features/admin/api';
 import type { Dashboard } from '../features/admin/types';
 import { formatDate, formatSize } from '../lib/format';
-import { getErrorMessage } from '../lib/http';
+import { whenLoaded } from '../lib/whenLoaded';
 
 const RANGES = [7, 14, 30, 90];
 
@@ -139,33 +139,15 @@ function DayChart({
   );
 }
 
-export function AdminDashboardPage() {
-  const [days, setDays] = useState(14);
-  const [data, setData] = useState<Dashboard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    getDashboard(days).then(
-      (result) => {
-        if (cancelled) return;
-        setData(result);
-        setError(null);
-      },
-      (err: unknown) => {
-        if (!cancelled) setError(getErrorMessage(err));
-      },
-    );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [days]);
-
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
-  if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
-
+export function DashboardView({
+  data,
+  days,
+  onDaysChange,
+}: {
+  data: Dashboard;
+  days: number;
+  onDaysChange: (days: number) => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -174,7 +156,7 @@ export function AdminDashboardPage() {
           Last
           <select
             value={days}
-            onChange={(event) => setDays(Number(event.target.value))}
+            onChange={(event) => onDaysChange(Number(event.target.value))}
             className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
           >
             {RANGES.map((range) => (
@@ -236,4 +218,33 @@ export function AdminDashboardPage() {
       </div>
     </div>
   );
+}
+
+export function AdminDashboardPage() {
+  const [days, setDays] = useState(14);
+  const [data, setData] = useState<Dashboard | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void whenLoaded(
+      getDashboard(days),
+      () => cancelled,
+      (result) => {
+        setData(result);
+        setError(null);
+      },
+      setError,
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [days]);
+
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
+
+  return <DashboardView data={data} days={days} onDaysChange={setDays} />;
 }
