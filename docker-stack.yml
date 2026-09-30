@@ -16,6 +16,10 @@ services:
       - postgres-data:/var/lib/postgresql
     deploy:
       replicas: 1
+      # Keeps room for the database however many workers the autoscaler starts
+      resources:
+        reservations:
+          memory: 256M
       restart_policy:
         condition: on-failure
 
@@ -139,6 +143,14 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AMQP_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
       MINIO_ENDPOINT: minio
+      # Sized with IMAGE_MAX_REPLICAS on the autoscaler: 2 x 512M must fit beside everything else
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
       MINIO_API_PORT: 9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -155,6 +167,15 @@ services:
       - target: 80
         published: 8080
         protocol: tcp
+      # Sized with VIDEO_MAX_REPLICAS on the autoscaler: 2 x 1G must fit beside everything else.
+      # One CPU matches the default FFMPEG_THREADS of 2 without starving the API.
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
         mode: host
     deploy:
       replicas: 1
@@ -169,9 +190,10 @@ services:
       POLL_INTERVAL_MS: 15000
       SCALE_DOWN_COOLDOWN_POLLS: 2
       IMAGE_MESSAGES_PER_REPLICA: 3
-      IMAGE_MAX_REPLICAS: 4
+      # Keep these in step with the worker resource limits above
+      IMAGE_MAX_REPLICAS: 2
       VIDEO_MESSAGES_PER_REPLICA: 2
-      VIDEO_MAX_REPLICAS: 3
+      VIDEO_MAX_REPLICAS: 2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     deploy:
