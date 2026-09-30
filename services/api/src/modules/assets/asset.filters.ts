@@ -16,8 +16,7 @@ import {
   type AssetKind,
 } from '../../shared/lib/asset-kind.ts';
 import { normalizeTag } from '../../shared/lib/tags.ts';
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+import { ONE_DAY_MS } from '../../shared/lib/time.ts';
 
 export type AssetFilters = {
   q?: string;

@@ -15,6 +15,8 @@ const schema = z.object({
 
   // How long a single readiness check may take before it counts as down
   HEALTH_TIMEOUT_MS: z.coerce.number().default(2000),
+  // Must stay below the orchestrator's stop grace period, or the process is killed mid-drain
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().default(10_000),
 
   MINIO_PUBLIC_URL: z.string().default('http://localhost:9000'),
   PRESIGNED_TTL_SECONDS: z.coerce.number().default(60 * 15), // 15 minutes

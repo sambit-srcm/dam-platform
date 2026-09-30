@@ -16,9 +16,6 @@ const server = createApp(ctx).listen(config.PORT, () => {
 
 const stopUploadCleanup = startUploadCleanup(ctx);
 
-// Give in-flight requests this long to finish before the process exits anyway
-const SHUTDOWN_TIMEOUT_MS = 10_000;
-
 let shuttingDown = false;
 
 // Finish in-flight requests, then close the database and queue connections
@@ -34,9 +31,12 @@ function shutdown(signal: string) {
   server.closeIdleConnections();
 
   const forceExit = setTimeout(() => {
-    logger.warn({ timeoutMs: SHUTDOWN_TIMEOUT_MS }, 'shutdown timed out');
+    logger.warn(
+      { timeoutMs: config.SHUTDOWN_TIMEOUT_MS },
+      'shutdown timed out',
+    );
     process.exit(1);
-  }, SHUTDOWN_TIMEOUT_MS);
+  }, config.SHUTDOWN_TIMEOUT_MS);
   forceExit.unref();
 
   server.close(async () => {
