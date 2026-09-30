@@ -2,22 +2,14 @@ import { pingDb } from '@dam/db';
 import { Router } from 'express';
 import { config } from './config.ts';
 import type { Context } from './shared/lib/context.ts';
+import { pingQueue } from './shared/lib/queue-check.ts';
+import { withTimeout } from './shared/lib/timeout.ts';
 
 type CheckResult = {
   status: 'up' | 'down';
   latencyMs: number;
   error?: string;
 };
-
-function withTimeout<T>(promise: Promise<T>, ms: number) {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`timed out after ${ms}ms`)),
-      ms,
-    );
-    promise.then(resolve, reject).finally(() => clearTimeout(timer));
-  });
-}
 
 async function runCheck(check: () => Promise<unknown>): Promise<CheckResult> {
   const startedAt = process.hrtime.bigint();
@@ -53,11 +45,7 @@ export function healthRoutes(ctx: Context) {
         const exists = await ctx.storage.bucketExists(ctx.bucket);
         if (!exists) throw new Error(`bucket "${ctx.bucket}" not found`);
       }),
-      runCheck(async () => {
-        // Opening and closing a channel proves the connection is usable
-        const channel = await ctx.queue.connection.createChannel();
-        await channel.close();
-      }),
+      runCheck(() => pingQueue(ctx.queue)),
     ]);
 
     const checks = { postgres, redis, minio, rabbitmq };
