@@ -1,8 +1,13 @@
+import { runMigrations } from '@dam/db';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { startUploadCleanup } from './modules/uploads/upload.cleanup.ts';
 import { createContext } from './shared/lib/context.ts';
 import { logger } from './shared/lib/logger.ts';
+
+// Before anything touches the database, so a new deploy never runs on an old schema
+await runMigrations(config.DATABASE_URL);
+logger.info('database migrations up to date');
 
 const ctx = await createContext();
 const server = createApp(ctx).listen(config.PORT, () => {
