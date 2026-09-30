@@ -53,6 +53,13 @@ export type UploadSession = {
   partCount: number;
 };
 
+export type UploadStatus = {
+  partSize: number;
+  partCount: number;
+  received: number[];
+  remaining: number[];
+};
+
 export type SignedPart = {
   partNumber: number;
   url: string;

@@ -248,7 +248,7 @@ describe('pages', () => {
   it('upload page invites people to drop files, with the size limit', () => {
     const html = show(<UploadPage />);
     expect(html).toContain('Drop files here or click to browse');
-    expect(html).toContain('up to 5 GB each');
+    expect(html).toContain('up to 300 MB each');
     expect(html).toContain('multiple');
   });
 

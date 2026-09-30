@@ -28,8 +28,14 @@ axios.defaults.adapter = async (config) => {
   };
 };
 
-const { getAssets, getAssetView, getDownloadUrl, getTags, uploadAsset } =
-  await import('../api');
+const {
+  getAssetView,
+  getAssets,
+  getDownloadUrl,
+  getTags,
+  resumeUpload,
+  uploadAsset,
+} = await import('../api');
 
 const json = (call: Call) =>
   typeof call.data === 'string' ? JSON.parse(call.data) : call.data;
@@ -179,17 +185,28 @@ describe('uploading a file', () => {
     expect(urls().at(-1)).toBe('/assets/uploads/a1/complete');
   });
 
-  it('gives up on a part after three tries and cancels the upload', async () => {
+  it('gives up on a part after three tries but leaves the upload open to resume', async () => {
     serverForUpload({ failPut: (url) => url.endsWith('/2') });
 
     await expect(uploadAsset(twelveBytes())).rejects.toThrow('storage hiccup');
 
     expect(calls.filter((c) => c.url.endsWith('/part/2'))).toHaveLength(3);
     expect(urls()).not.toContain('/assets/uploads/a1/complete');
-    expect(urls('DELETE')).toEqual(['/assets/uploads/a1']);
+    expect(urls('DELETE')).toEqual([]);
   });
 
-  it('does not try to cancel when the upload never started', async () => {
+  it('hands back the upload id as soon as the API opens it', async () => {
+    serverForUpload({ failPut: () => true });
+    const opened: string[] = [];
+
+    await expect(
+      uploadAsset(twelveBytes(), undefined, (id) => opened.push(id)),
+    ).rejects.toThrow();
+
+    expect(opened).toEqual(['a1']);
+  });
+
+  it('stops at once when the upload never started', async () => {
     handler = () => new Error('API down');
 
     await expect(uploadAsset(twelveBytes())).rejects.toThrow('API down');
@@ -220,5 +237,46 @@ describe('uploading a file', () => {
   it('works without a progress callback', async () => {
     serverForUpload({});
     await expect(uploadAsset(twelveBytes())).resolves.toBeDefined();
+  });
+});
+
+describe('resuming a failed upload', () => {
+  // Storage already has parts 1 and 3 of the 12 byte file; part 2 is missing
+  function serverForResume(received = [1, 3], remaining = [2]) {
+    serverForUpload({});
+    const upload = handler;
+    handler = (call, config) =>
+      call.method === 'GET' && call.url === '/assets/uploads/a1'
+        ? { partSize: 5, partCount: 3, received, remaining }
+        : upload(call, config);
+  }
+
+  it('sends only the parts storage is missing, then completes', async () => {
+    serverForResume();
+
+    await resumeUpload('a1', twelveBytes());
+
+    expect(urls('PUT')).toEqual(['https://storage.test/part/2']);
+    expect(urls().at(-1)).toBe('/assets/uploads/a1/complete');
+  });
+
+  it('starts the progress bar from what already arrived', async () => {
+    serverForResume();
+    const seen: number[] = [];
+
+    await resumeUpload('a1', twelveBytes(), (percent) => seen.push(percent));
+
+    // Parts 1 and 3 are 5 + 2 of the 12 bytes
+    expect(seen[0]).toBe(58);
+    expect(seen.at(-1)).toBe(100);
+  });
+
+  it('goes straight to completing when nothing is missing', async () => {
+    serverForResume([1, 2, 3], []);
+
+    await resumeUpload('a1', twelveBytes());
+
+    expect(urls('PUT')).toEqual([]);
+    expect(urls().at(-1)).toBe('/assets/uploads/a1/complete');
   });
 });

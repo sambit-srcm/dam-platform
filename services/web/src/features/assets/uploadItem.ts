@@ -3,6 +3,8 @@ import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from './api';
 export type UploadItem = {
   id: string;
   file: File;
+  // Set once the API has opened the upload, so a failed one can be resumed
+  assetId?: string;
   state: 'queued' | 'uploading' | 'done' | 'error';
   progress: number;
   error?: string;

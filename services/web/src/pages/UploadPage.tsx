@@ -1,6 +1,10 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { uploadAsset } from '../features/assets/api';
+import {
+  MAX_UPLOAD_MB,
+  resumeUpload,
+  uploadAsset,
+} from '../features/assets/api';
 import { toUploadItem, type UploadItem } from '../features/assets/uploadItem';
 import { getErrorMessage } from '../lib/http';
 
@@ -13,7 +17,13 @@ const STATE_STYLES: Record<UploadItem['state'], string> = {
   error: 'text-red-600',
 };
 
-export function UploadList({ items }: { items: UploadItem[] }) {
+export function UploadList({
+  items,
+  onRetry,
+}: {
+  items: UploadItem[];
+  onRetry?: (item: UploadItem) => void;
+}) {
   return (
     <ul className="mt-6 divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
       {items.map((item) => (
@@ -37,7 +47,18 @@ export function UploadList({ items }: { items: UploadItem[] }) {
             </div>
           )}
           {item.error && (
-            <p className="mt-1 text-xs text-red-600">{item.error}</p>
+            <div className="mt-1 flex items-center justify-between gap-4">
+              <p className="text-xs text-red-600">{item.error}</p>
+              {onRetry && item.state === 'error' && item.assetId && (
+                <button
+                  type="button"
+                  onClick={() => onRetry(item)}
+                  className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
         </li>
       ))}
@@ -62,19 +83,35 @@ export function UploadPage() {
     setItems((current) => [...current, ...Array.from(files).map(toUploadItem)]);
   };
 
+  // Starts the upload, or picks up a failed one where storage left off
+  const send = async (item: UploadItem) => {
+    const onProgress = (progress: number) => update(item.id, { progress });
+    update(item.id, { state: 'uploading', error: undefined });
+    try {
+      if (item.assetId) {
+        await resumeUpload(item.assetId, item.file, onProgress);
+      } else {
+        await uploadAsset(item.file, onProgress, (assetId) =>
+          update(item.id, { assetId }),
+        );
+      }
+      update(item.id, { state: 'done', progress: 100 });
+    } catch (error) {
+      update(item.id, { state: 'error', error: getErrorMessage(error) });
+    }
+  };
+
   const uploadAll = async () => {
     setBusy(true);
     for (const item of items.filter((i) => i.state === 'queued')) {
-      update(item.id, { state: 'uploading', progress: 0 });
-      try {
-        await uploadAsset(item.file, (progress) =>
-          update(item.id, { progress }),
-        );
-        update(item.id, { state: 'done', progress: 100 });
-      } catch (error) {
-        update(item.id, { state: 'error', error: getErrorMessage(error) });
-      }
+      await send(item);
     }
+    setBusy(false);
+  };
+
+  const retry = async (item: UploadItem) => {
+    setBusy(true);
+    await send(item);
     setBusy(false);
   };
 
@@ -107,7 +144,7 @@ export function UploadPage() {
           Drop files here or click to browse
         </p>
         <p className="mt-1 text-xs text-gray-500">
-          Images, videos and PDFs, up to 5 GB each
+          Images, videos and PDFs, up to {MAX_UPLOAD_MB} MB each
         </p>
         <input
           ref={inputRef}
@@ -124,7 +161,7 @@ export function UploadPage() {
 
       {items.length > 0 && (
         <>
-          <UploadList items={items} />
+          <UploadList items={items} onRetry={busy ? undefined : retry} />
 
           <div className="mt-4 flex items-center gap-3">
             <button
