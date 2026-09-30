@@ -16,7 +16,7 @@ const schema = z.object({
   STACK_NAME: z.string().default('dam-platform'),
 
   POLL_INTERVAL_MS: z.coerce.number().default(30_000),
-  // Consecutive empty polls required before scaling down, so a brief lull doesn't cause flapping
+  // Consecutive empty polls required before scaling down
   SCALE_DOWN_COOLDOWN_POLLS: z.coerce.number().default(3),
 
   IMAGE_QUEUE: z.string().default('dam.thumbnail-generation'),

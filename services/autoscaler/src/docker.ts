@@ -1,7 +1,7 @@
 import { request } from 'node:http';
 import { config } from './config.ts';
 
-// Sends one request to the Docker Engine API over the socket that's
+// Sends one request to the Docker Engine API over the socket
 function callDockerApi(method: string, path: string, bodyToSend?: unknown) {
   return new Promise((resolve, reject) => {
     const requestBody = bodyToSend ? JSON.stringify(bodyToSend) : undefined;
