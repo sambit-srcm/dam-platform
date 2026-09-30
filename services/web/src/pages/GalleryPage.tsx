@@ -7,6 +7,7 @@ import {
 } from '../features/assets/api';
 import { AssetFilterBar } from '../features/assets/AssetFilterBar';
 import { AssetViewer } from '../features/assets/AssetViewer';
+import { PAGE_SIZE } from '../features/assets/constants';
 import { Pager } from '../features/assets/Pager';
 import { TagList } from '../features/assets/TagList';
 import { useAssetQuery } from '../features/assets/useAssetQuery';
@@ -14,8 +15,6 @@ import { useAssetSearch } from '../features/assets/useAssetSearch';
 import { formatSize } from '../lib/format';
 import { getErrorMessage } from '../lib/http';
 import type { Asset } from '../features/assets/types';
-
-const PAGE_SIZE = 24;
 
 const isPending = (asset: Asset) =>
   asset.status !== 'ready' && asset.status !== 'failed';
