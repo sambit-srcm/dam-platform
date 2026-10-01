@@ -182,6 +182,7 @@ Every service validates its environment at startup and exits with a list of the 
 | `JWT_EXPIRES_IN_SECONDS`                   | api        | Token lifetime                                      | 3600                       |
 | `MAX_UPLOAD_MB`                            | api        | Largest accepted upload (keep equal in the web app) | 300                        |
 | `CORS_ORIGIN`                              | api        | Browser origins allowed to call the API             | local                      |
+| `RATE_LIMIT_ENABLED`                       | api        | Request limits per address and per user             | true                       |
 | `UPLOAD_SESSION_TTL_SECONDS`               | api        | How long an unfinished upload stays open            | 3600                       |
 | `SHUTDOWN_TIMEOUT_MS`                      | api        | Time allowed to drain on shutdown                   | 10000                      |
 | `VIDEO_PREFETCH`, `FFMPEG_THREADS`         | video      | Jobs at once and threads per encode                 | 1, 2                       |
@@ -189,6 +190,11 @@ Every service validates its environment at startup and exits with a list of the 
 | `POLL_INTERVAL_MS`                         | autoscaler | How often queue depth is checked                    | 30000 (15000 in the stack) |
 
 `.env.example` lists the rest.
+
+## Security notes
+
+- **Rate limiting.** The API counts requests in Redis, so every replica shares one count. Failed sign-ins are limited per account and per address, sign-ups per address, upload starts per user, and everything else per address and per user. Going over answers `429` with `Retry-After`. Limits live in `services/api/src/shared/middlewares/rateLimit.ts`.
+- **Security headers.** The API sets them with helmet, and nginx sets them on the web app, including a Content Security Policy that restricts scripts to the app's own origin. The `/docs` page relaxes its policy only enough to load Redoc from jsdelivr.
 
 ## Testing and quality
 
@@ -203,4 +209,4 @@ Tests cover the essentials: access control and route protection, upload planning
 
 ## Status
 
-The platform runs end to end: accounts, resumable uploads, image and video processing, admin reporting, and autoscaled workers on Docker Swarm. Known gaps before a production deployment: no login rate limiting, services use the MinIO root credentials, and images are built locally rather than pulled from a registry.
+The platform runs end to end: accounts, resumable uploads, image and video processing, admin reporting, and autoscaled workers on Docker Swarm. Known gaps before a production deployment: services use the MinIO root credentials, and images are built locally rather than pulled from a registry.
