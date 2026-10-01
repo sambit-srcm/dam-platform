@@ -1,4 +1,4 @@
-FROM node:25-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/db/package.json packages/db/package.json
