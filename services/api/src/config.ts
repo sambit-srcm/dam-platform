@@ -34,6 +34,12 @@ const schema = z.object({
   PART_URL_BATCH_SIZE: z.coerce.number().default(10), // how many presigned part URLs to generate at once
   UPLOAD_CLEANUP_INTERVAL_SECONDS: z.coerce.number().default(60 * 10), // how often abandoned uploads are swept
 
+  // Turn off only for local experiments; counters live in Redis
+  RATE_LIMIT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+
   // Signs login tokens; generate with `openssl rand -hex 32`
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
