@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { Router } from 'express';
+import helmet from 'helmet';
 
 // Read once when the API starts, so a missing file stops the start instead of giving a blank page
 const spec = readFileSync(
@@ -22,8 +23,26 @@ const page = `<!doctype html>
 </html>
 `;
 
+//docs policy
+const docsPolicy = helmet.contentSecurityPolicy({
+  useDefaults: false,
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:', 'https:'],
+    workerSrc: ["'self'", 'blob:'],
+    connectSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    frameAncestors: ["'none'"],
+  },
+});
+
 export function docsRoutes() {
   const router = Router();
+
+  router.use(docsPolicy);
 
   router.get('/', (req, res) => {
     if (!req.originalUrl.split('?')[0]!.endsWith('/')) {

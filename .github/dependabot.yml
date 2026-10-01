@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  # One entry at the root covers every workspace package through pnpm-lock.yaml
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: docker
+    directories:
+      - /services/api
+      - /services/web
+      - /services/video-worker
+      - /services/thumbnail-worker
+      - /services/autoscaler
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore'

@@ -13,6 +13,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',
+      RATE_LIMIT_ENABLED: 'false',
       DATABASE_URL: 'postgres://test:test@localhost:5432/test',
       REDIS_URL: 'redis://localhost:6379',
       AMQP_URL: 'amqp://localhost',

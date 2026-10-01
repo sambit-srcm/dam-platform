@@ -18,6 +18,11 @@ info:
     answers `404`, exactly like a missing one, so ids cannot be probed.
     Admins use the `/admin` routes to see every asset.
 
+    **Rate limits.** Requests are counted per client address, and per user once
+    signed in. Failed sign-ins are counted per account too. Going over a limit
+    answers `429` with a `Retry-After` header (seconds) and the usual error
+    envelope. Health checks are never limited.
+
     **Errors.** Every failure uses the same envelope, see `Error`. The
     `requestId` matches the request log line.
 
@@ -125,6 +130,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/login:
     post:
       operationId: login
@@ -150,6 +156,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/me:
     get:
       operationId: getMe
@@ -590,6 +597,15 @@ components:
   responses:
     ValidationError:
       description: The request did not pass validation. The message lists each field.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooManyRequests:
+      description: Too many requests. Wait the number of seconds in `Retry-After`.
+      headers:
+        Retry-After:
+          description: Seconds until the limit resets.
+          schema: { type: integer }
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }

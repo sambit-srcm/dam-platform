@@ -1,4 +1,4 @@
-FROM node:25-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/db/package.json packages/db/package.json
@@ -12,7 +12,7 @@ RUN npm install -g pnpm@10.24.0 && pnpm install --frozen-lockfile
 COPY . .
 RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts
 
-FROM node:25-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /repo
 COPY --from=build /repo /repo
 WORKDIR /repo/services/autoscaler
