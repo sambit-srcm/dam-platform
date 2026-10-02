@@ -1,4 +1,4 @@
-import { createDb, type Db } from '@dam/db';
+import { createDb, DB_POOL_LIMITS, type Db } from '@dam/db';
 import { connectJobQueue, type JobQueue } from '@dam/queue';
 import { Client as MinioClient } from 'minio';
 import { createClient, type RedisClientType } from 'redis';
@@ -20,6 +20,10 @@ export async function createContext(): Promise<Context> {
   //Added DB pool max value for connection
   const db = createDb(config.DATABASE_URL, {
     maxConnections: config.DB_POOL_MAX,
+    ...DB_POOL_LIMITS,
+  });
+  db.$client.on('error', (error: Error) => {
+    logger.error({ err: error }, 'database pool error');
   });
   const queue = await connectJobQueue(config.AMQP_URL);
 
