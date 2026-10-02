@@ -29,6 +29,12 @@ describe('errors the API can show to people', () => {
     expect(new ConflictError('x').name).toBe('ConflictError');
   });
 
+  it('keeps the original failure as the cause', () => {
+    const source = Object.assign(new Error('duplicate'), { code: '23505' });
+    const error = new ConflictError('taken', source);
+    expect(error.cause).toBe(source);
+  });
+
   it('has a sensible default message', () => {
     expect(new NotFoundError().message).toBe('Not found');
     expect(new UnauthorizedError().message).toBe('Authentication required');
