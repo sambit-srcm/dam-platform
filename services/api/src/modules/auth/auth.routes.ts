@@ -3,6 +3,7 @@ import type { Context } from '../../shared/lib/context.ts';
 import { requireAuth } from '../../shared/middlewares/requireAuth.ts';
 import {
   loginController,
+  logoutController,
   meController,
   registerController,
 } from './auth.controller.ts';
@@ -12,6 +13,7 @@ export function authRoutes(ctx: Context) {
 
   router.post('/register', registerController(ctx));
   router.post('/login', loginController(ctx));
+  router.post('/logout', logoutController());
   router.get('/me', requireAuth, meController(ctx));
 
   return router;

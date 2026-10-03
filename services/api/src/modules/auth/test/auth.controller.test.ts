@@ -10,6 +10,7 @@ vi.mock('../auth.service.ts', () => ({
 
 import {
   loginController,
+  logoutController,
   meController,
   registerController,
 } from '../auth.controller.ts';
@@ -34,7 +35,12 @@ describe('sign up endpoint', () => {
     await registerController(ctx)(req, res);
 
     expect(mocks.status).toHaveBeenCalledWith(201);
-    expect(mocks.json).toHaveBeenCalledWith(session);
+    expect(mocks.json).toHaveBeenCalledWith({ user: session.user });
+    expect(mocks.cookie).toHaveBeenCalledWith(
+      'dam_token',
+      'jwt',
+      expect.objectContaining({ httpOnly: true }),
+    );
     expect(log.info).toHaveBeenCalledOnce();
   });
 
@@ -81,7 +87,12 @@ describe('sign in endpoint', () => {
     await loginController(ctx)(req, res);
 
     expect(mocks.status).not.toHaveBeenCalled();
-    expect(mocks.json).toHaveBeenCalledWith(session);
+    expect(mocks.json).toHaveBeenCalledWith({ user: session.user });
+    expect(mocks.cookie).toHaveBeenCalledWith(
+      'dam_token',
+      'jwt',
+      expect.objectContaining({ httpOnly: true }),
+    );
     expect(log.info).toHaveBeenCalledOnce();
   });
 
@@ -90,6 +101,21 @@ describe('sign in endpoint', () => {
 
     await expect(loginController(ctx)(req, fakeRes().res)).rejects.toThrow();
     expect(login).not.toHaveBeenCalled();
+  });
+});
+
+describe('sign out endpoint', () => {
+  it('clears the cookie and answers 204', () => {
+    const { res, mocks } = fakeRes();
+
+    logoutController()({} as never, res);
+
+    expect(mocks.clearCookie).toHaveBeenCalledWith(
+      'dam_token',
+      expect.objectContaining({ httpOnly: true }),
+    );
+    expect(mocks.status).toHaveBeenCalledWith(204);
+    expect(mocks.end).toHaveBeenCalledOnce();
   });
 });
 

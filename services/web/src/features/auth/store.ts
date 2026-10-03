@@ -1,23 +1,21 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { AuthResponse, AuthUser } from './types';
+import type { AuthUser } from './types';
 
 type AuthState = {
-  token: string | null;
   user: AuthUser | null;
-  setSession: (session: AuthResponse) => void;
-  logout: () => void;
+  // False until the first /auth/me check finishes, so a refresh does not flash the login page
+  ready: boolean;
+  setUser: (user: AuthUser | null) => void;
+  clearUser: () => void;
 };
 
-// Kept in localStorage so a refresh doesn't sign the user out
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      token: null,
-      user: null,
-      setSession: ({ token, user }) => set({ token, user }),
-      logout: () => set({ token: null, user: null }),
-    }),
-    { name: 'dam-auth' },
-  ),
-);
+// The session token lives in an HttpOnly cookie, so this store only remembers who is signed in.
+// Drop any token left behind by the previous localStorage session.
+localStorage.removeItem('dam-auth');
+
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: null,
+  ready: false,
+  setUser: (user) => set({ user, ready: true }),
+  clearUser: () => set({ user: null, ready: true }),
+}));

@@ -13,7 +13,7 @@ beforeEach(() => {
       data: JSON.parse(config.data),
     });
     return {
-      data: { token: 't', user: { id: 'u1' } },
+      data: { user: { id: 'u1' } },
       status: 200,
       statusText: 'OK',
       headers: {},
@@ -32,7 +32,7 @@ describe('sign-in API calls', () => {
       url: '/auth/login',
       data: credentials,
     });
-    expect(result.token).toBe('t');
+    expect(result.user.id).toBe('u1');
   });
 
   it('posts the email and password to /auth/register', async () => {
