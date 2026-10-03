@@ -6,6 +6,12 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['**/*.test.{ts,tsx}', 'src/test/**', '**/*.d.ts'],
+      thresholds: {
+        statements: 50,
+        branches: 50,
+        functions: 40,
+        lines: 50,
+      },
       reporter: ['text', 'html'],
     },
     include: ['src/**/*.test.ts'],
