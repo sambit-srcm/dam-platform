@@ -1,21 +1,23 @@
 import axios from 'axios';
 import { useAuthStore } from '../features/auth/store';
 
-export const http = axios.create({ baseURL: '/api' });
-
-http.interceptors.request.use((config) => {
-  const { token } = useAuthStore.getState();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+export const http = axios.create({
+  baseURL: '/api/v1',
+  withCredentials: true,
 });
 
-// An expired or rejected token signs the user out, which sends them to the login page
+// An expired session signs the user out, which sends them to the login page.
+// Login and logout handle their own 401s.
 http.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
-    const { token, logout } = useAuthStore.getState();
-    if (axios.isAxiosError(error) && error.response?.status === 401 && token) {
-      logout();
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const path = error.config?.url ?? '';
+      const signing =
+        path.endsWith('/auth/login') || path.endsWith('/auth/logout');
+      if (!signing && useAuthStore.getState().user) {
+        useAuthStore.getState().clearUser();
+      }
     }
     return Promise.reject(error);
   },

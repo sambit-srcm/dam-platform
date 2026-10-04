@@ -32,7 +32,7 @@ export function AuthForm({ mode }: Props) {
   const copy = COPY[mode];
   const navigate = useNavigate();
   const location = useLocation();
-  const setSession = useAuthStore((state) => state.setSession);
+  const setUser = useAuthStore((state) => state.setUser);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,10 +48,10 @@ export function AuthForm({ mode }: Props) {
     setBusy(true);
     try {
       const session = await (mode === 'login' ? login : register)({
-        email,
+        email: email.trim(),
         password,
       });
-      setSession(session);
+      setUser(session.user);
       navigate(destination, { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
@@ -68,38 +68,55 @@ export function AuthForm({ mode }: Props) {
         <h1 className="text-lg font-semibold">DAM platform</h1>
         <h2 className="mt-1 mb-5 text-sm text-gray-500">{copy.title}</h2>
 
-        <label className="block text-sm font-medium">
+        <label htmlFor="email" className="block text-sm font-medium">
           Email
           <input
+            id="email"
             type="email"
             required
+            maxLength={254}
             autoComplete="email"
             value={email}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'auth-error' : undefined}
             onChange={(e) => setEmail(e.target.value)}
             className={inputClass}
           />
         </label>
 
-        <label className="mt-4 block text-sm font-medium">
+        <label htmlFor="password" className="mt-4 block text-sm font-medium">
           Password
           <input
+            id="password"
             type="password"
             required
             minLength={mode === 'register' ? 8 : undefined}
+            maxLength={128}
             autoComplete={
               mode === 'login' ? 'current-password' : 'new-password'
             }
             value={password}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={
+              [
+                mode === 'register' ? 'password-hint' : null,
+                error ? 'auth-error' : null,
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
             onChange={(e) => setPassword(e.target.value)}
             className={inputClass}
           />
         </label>
         {mode === 'register' && (
-          <p className="mt-1 text-xs text-gray-500">At least 8 characters</p>
+          <p id="password-hint" className="mt-1 text-xs text-gray-500">
+            At least 8 characters
+          </p>
         )}
 
         {error && (
-          <p role="alert" className="mt-4 text-sm text-red-600">
+          <p id="auth-error" role="alert" className="mt-4 text-sm text-red-600">
             {error}
           </p>
         )}

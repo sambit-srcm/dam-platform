@@ -14,6 +14,7 @@ export function useAssetQuery() {
     from: get('from'),
     to: get('to'),
     sort: (get('sort') ?? 'createdAt') as AssetSort,
+    scope: get('scope') === 'team' ? 'team' : 'mine',
   };
   const offset = Number(params.get('offset')) || 0;
 

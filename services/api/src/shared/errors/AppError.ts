@@ -2,8 +2,8 @@ export class AppError extends Error {
   status: number;
   code: string;
 
-  constructor(status: number, code: string, message: string) {
-    super(message);
+  constructor(status: number, code: string, message: string, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
     this.name = new.target.name;
     this.status = status;
     this.code = code;
@@ -11,8 +11,8 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string) {
-    super(400, 'validation_error', message);
+  constructor(message: string, cause?: unknown) {
+    super(400, 'validation_error', message, cause);
   }
 }
 
@@ -35,8 +35,8 @@ export class ForbiddenError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string) {
-    super(409, 'conflict', message);
+  constructor(message: string, cause?: unknown) {
+    super(409, 'conflict', message, cause);
   }
 }
 

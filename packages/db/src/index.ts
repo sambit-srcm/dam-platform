@@ -2,12 +2,31 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import * as schema from './schema.ts';
 
+// Idle clients are released after 30s. A query that runs longer than 15s is cancelled.
+// Migrations leave these unset so a slow migration is not cut off.
+export const DB_POOL_LIMITS = {
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  statementTimeoutMillis: 15_000,
+} as const;
+
 export function createDb(
   connectionString: string,
-  options?: { maxConnections?: number },
+  options?: {
+    maxConnections?: number;
+    idleTimeoutMillis?: number;
+    connectionTimeoutMillis?: number;
+    statementTimeoutMillis?: number;
+  },
 ) {
   return drizzle({
-    connection: { connectionString, max: options?.maxConnections },
+    connection: {
+      connectionString,
+      max: options?.maxConnections,
+      idleTimeoutMillis: options?.idleTimeoutMillis,
+      connectionTimeoutMillis: options?.connectionTimeoutMillis,
+      statement_timeout: options?.statementTimeoutMillis,
+    },
     schema,
     casing: 'snake_case',
   });

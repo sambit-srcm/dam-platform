@@ -8,7 +8,14 @@ const mocks = vi.hoisted(() => ({
   minio: vi.fn(),
 }));
 
-vi.mock('@dam/db', () => ({ createDb: mocks.createDb }));
+vi.mock('@dam/db', () => ({
+  createDb: mocks.createDb,
+  DB_POOL_LIMITS: {
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    statementTimeoutMillis: 15_000,
+  },
+}));
 vi.mock('@dam/queue', () => ({ connectJobQueue: mocks.connectJobQueue }));
 vi.mock('minio', () => ({
   Client: class {
@@ -22,7 +29,9 @@ import { createContext } from '../context.ts';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.createDb.mockReturnValue({ $client: { end: mocks.dbEnd } });
+  mocks.createDb.mockReturnValue({
+    $client: { end: mocks.dbEnd, on: vi.fn() },
+  });
   mocks.connectJobQueue.mockResolvedValue({ close: mocks.queueClose });
 });
 
@@ -31,7 +40,12 @@ describe('starting the worker', () => {
     await createContext();
     expect(mocks.createDb).toHaveBeenCalledWith(
       'postgres://test:test@localhost:5432/test',
-      { maxConnections: 10 },
+      {
+        maxConnections: 10,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 5_000,
+        statementTimeoutMillis: 15_000,
+      },
     );
   });
 

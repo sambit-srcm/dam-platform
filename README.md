@@ -59,17 +59,17 @@ flowchart LR
 ### Request flow
 
 1. The browser talks to the **web** container. Nginx serves the React app and forwards `/api/*` to the **API**, stripping the prefix.
-2. The **API** authenticates every request except `/health/*`, `/auth/register` and `/auth/login`, stores metadata in **PostgreSQL**, and uses **Redis** for download statistics, upload progress and a lock for the cleanup sweeper.
+2. The **API** authenticates every request except `/health/*`, `/v1/auth/register`, `/v1/auth/login`, `/v1/auth/logout` and `/v1/shares/:token`. Sign-in sets an HttpOnly `dam_token` cookie; the token is not stored in the browser's JavaScript. A share link is its own credential for one asset. The API stores metadata in **PostgreSQL**, and uses **Redis** for download statistics, upload progress and a lock for the cleanup sweeper. Resource routes are under `/v1`. Health and docs are not.
 3. On startup the API applies pending database migrations under a Postgres advisory lock, so several replicas can start together safely.
 
 ### Uploads
 
 Files never pass through the API.
 
-1. `POST /assets/uploads` declares the file. The API opens a multipart upload in MinIO, creates the asset with status `uploading`, and returns the part plan (5 MiB or larger parts, at most 10,000 of them).
+1. `POST /v1/assets/uploads` declares the file. The API opens a multipart upload in MinIO, creates the asset with status `uploading`, and returns the part plan (5 MiB or larger parts, at most 10,000 of them).
 2. The browser asks for presigned URLs (`POST …/parts`, up to 10 at a time) and `PUT`s each part directly to MinIO.
 3. `POST …/complete` makes the API check storage for the right parts and total size, finish the multipart upload, and publish the processing jobs. A size mismatch aborts the upload and marks the asset `failed`.
-4. If a part fails, the upload stays open. The web app shows a **Retry** button that asks `GET /assets/uploads/:id` which parts arrived and sends only the missing ones.
+4. If a part fails, the upload stays open. The web app shows a **Retry** button that asks `GET /v1/assets/uploads/:id` which parts arrived and sends only the missing ones.
 5. Uploads are limited to `MAX_UPLOAD_MB` (300 by default) and stay open for one hour. A sweeper running every ten minutes aborts expired uploads and marks them `failed` (`upload_expired`).
 6. While the queue is down, uploads of types that need processing are refused with `503`, so a file is never accepted that cannot be processed.
 
@@ -92,13 +92,15 @@ Files never pass through the API.
 
 The full REST API is described in [`docs/openapi.yaml`](docs/openapi.yaml) (OpenAPI 3.1).
 
-| Area    | Endpoints                                                                                                                |
-| ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Health  | `GET /health`, `/health/live`, `/health/ready`                                                                           |
-| Auth    | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`                                                                |
-| Assets  | `GET /assets`, `GET /assets/tags`, `GET /assets/:id`, `GET /assets/:id/view`, `POST /assets/:id/download`                |
-| Uploads | `POST /assets/uploads`, `GET` / `DELETE /assets/uploads/:id`, `POST …/parts`, `POST …/parts/recorded`, `POST …/complete` |
-| Admin   | `GET /admin/dashboard`, `GET /admin/assets`, `GET /admin/assets/:id`, `GET /admin/tags` (admin role only)                |
+| Area    | Endpoints                                                                                                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Health  | `GET /health`, `/health/live`, `/health/ready`                                                                                                                                                           |
+| Auth    | `POST /v1/auth/register`, `POST /v1/auth/login`, `POST /v1/auth/logout`, `GET /v1/auth/me`                                                                                                               |
+| Assets  | `GET /v1/assets`, `GET /v1/assets/tags`, `GET /v1/assets/:id`, `GET /v1/assets/:id/view`, `POST /v1/assets/:id/download`                                                                                 |
+| Teams   | `GET /v1/teams` (teams you belong to). Admins: `GET` / `POST /v1/admin/teams`, `GET` / `POST /v1/admin/teams/:id/members`, `DELETE /v1/admin/teams/:id/members/:userId`                                  |
+| Sharing | `GET /v1/assets/:id/sharing`, `PUT` / `DELETE /v1/assets/:id/teams/:teamId`, `POST /v1/assets/:id/shares`, `DELETE …/shares/:shareId`, public `GET /v1/shares/:token`, `POST /v1/shares/:token/download` |
+| Uploads | `POST /v1/assets/uploads`, `GET` / `DELETE /v1/assets/uploads/:id`, `POST …/parts`, `POST …/parts/recorded`, `POST …/complete`                                                                           |
+| Admin   | `GET /v1/admin/dashboard`, `GET /v1/admin/assets`, `GET /v1/admin/assets/:id`, `GET /v1/admin/tags` (admin role only)                                                                                    |
 
 Errors always look like `{ "error": { "code", "message", "requestId" } }`.
 
@@ -176,18 +178,18 @@ The web app is then at <http://localhost:8080> and the API at <http://localhost:
 
 Every service validates its environment at startup and exits with a list of the problems. The variables you will most often change:
 
-| Variable                                   | Service    | Purpose                                             | Default                    |
-| ------------------------------------------ | ---------- | --------------------------------------------------- | -------------------------- |
-| `JWT_SECRET`                               | api        | Signs login tokens, required                        | none                       |
-| `JWT_EXPIRES_IN_SECONDS`                   | api        | Token lifetime                                      | 3600                       |
-| `MAX_UPLOAD_MB`                            | api        | Largest accepted upload (keep equal in the web app) | 300                        |
-| `CORS_ORIGIN`                              | api        | Browser origins allowed to call the API             | local                      |
-| `RATE_LIMIT_ENABLED`                       | api        | Request limits per address and per user             | true                       |
-| `UPLOAD_SESSION_TTL_SECONDS`               | api        | How long an unfinished upload stays open            | 3600                       |
-| `SHUTDOWN_TIMEOUT_MS`                      | api        | Time allowed to drain on shutdown                   | 10000                      |
-| `VIDEO_PREFETCH`, `FFMPEG_THREADS`         | video      | Jobs at once and threads per encode                 | 1, 2                       |
-| `IMAGE_MAX_REPLICAS`, `VIDEO_MAX_REPLICAS` | autoscaler | Upper bound on worker replicas                      | 6, 4                       |
-| `POLL_INTERVAL_MS`                         | autoscaler | How often queue depth is checked                    | 30000 (15000 in the stack) |
+| Variable                                   | Service    | Purpose                                                 | Default                                       |
+| ------------------------------------------ | ---------- | ------------------------------------------------------- | --------------------------------------------- |
+| `JWT_SECRET`                               | api        | Signs login tokens, required                            | none                                          |
+| `JWT_EXPIRES_IN_SECONDS`                   | api        | Token lifetime                                          | 3600                                          |
+| `MAX_UPLOAD_MB`                            | api        | Largest accepted upload (keep equal in the web app)     | 300                                           |
+| `CORS_ORIGIN`                              | api        | Comma-separated browser origins allowed to call the API | `http://localhost:5173,http://localhost:8080` |
+| `RATE_LIMIT_ENABLED`                       | api        | Request limits per address and per user                 | true                                          |
+| `UPLOAD_SESSION_TTL_SECONDS`               | api        | How long an unfinished upload stays open                | 3600                                          |
+| `SHUTDOWN_TIMEOUT_MS`                      | api        | Time allowed to drain on shutdown                       | 10000                                         |
+| `VIDEO_PREFETCH`, `FFMPEG_THREADS`         | video      | Jobs at once and threads per encode                     | 1, 2                                          |
+| `IMAGE_MAX_REPLICAS`, `VIDEO_MAX_REPLICAS` | autoscaler | Upper bound on worker replicas                          | 6, 4                                          |
+| `POLL_INTERVAL_MS`                         | autoscaler | How often queue depth is checked                        | 30000 (15000 in the stack)                    |
 
 `.env.example` lists the rest.
 
@@ -200,10 +202,12 @@ Every service validates its environment at startup and exits with a list of the 
 
 ```bash
 pnpm test             # Vitest across every workspace
-pnpm test:coverage    # with coverage reports
+pnpm test:coverage    # with coverage reports; CI fails if coverage drops under the configured floors
 pnpm lint             # ESLint
 pnpm format:check     # Prettier
 ```
+
+`pnpm --filter @dam/api test:integration` applies the migrations to the database in `DATABASE_URL` and checks the length constraints. CI runs that against Postgres. `pnpm --filter @dam/web test:e2e` opens the web app in Chromium and checks that a failed sign-in is tied to the fields.
 
 Tests cover the essentials: access control and route protection, upload planning and validation, queue publishing and retry behaviour, autoscaling decisions, and the main web flows. Git hooks run the linters, a secret scan and commit message checks, and CI runs the same checks on pull requests.
 

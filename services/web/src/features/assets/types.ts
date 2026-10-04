@@ -13,6 +13,7 @@ export type Asset = {
   tags: string[];
   createdAt: string;
   thumbnailUrl: string | null;
+  access?: 'owner' | 'team';
 };
 
 export type AssetListResponse = {
@@ -32,6 +33,7 @@ export type AssetFilters = {
   from?: string;
   to?: string;
   sort?: AssetSort;
+  scope?: 'mine' | 'team';
 };
 
 export type ListAssetsParams = AssetFilters & {

@@ -21,11 +21,18 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const startedAt = process.hrtime.bigint();
 
   res.on('finish', () => {
+    const path = (req.originalUrl.split('?')[0] ?? req.originalUrl).replace(
+      /(\/shares\/)[^/]+/,
+      '$1[redacted]',
+    );
+    // Health probes run constantly; only log them when they fail
+    if (path.startsWith('/health') && res.statusCode < 400) return;
+
     const ms = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
     req.log.info(
       {
         method: req.method,
-        path: req.originalUrl,
+        path,
         status: res.statusCode,
         durationMs: Math.round(ms),
       },

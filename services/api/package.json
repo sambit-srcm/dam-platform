@@ -1,5 +1,6 @@
 {
   "name": "@dam/api",
+  "description": "HTTP API for the DAM platform",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1137.0",

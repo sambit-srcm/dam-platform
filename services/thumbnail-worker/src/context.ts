@@ -1,7 +1,8 @@
-import { createDb, type Db } from '@dam/db';
+import { createDb, DB_POOL_LIMITS, type Db } from '@dam/db';
 import { connectJobQueue, type JobQueue } from '@dam/queue';
 import { Client as MinioClient } from 'minio';
 import { config } from './config.ts';
+import { logger } from './logger.ts';
 
 // The clients the worker uses, created once at startup
 export type Context = {
@@ -15,6 +16,10 @@ export type Context = {
 export async function createContext(): Promise<Context> {
   const db = createDb(config.DATABASE_URL, {
     maxConnections: config.DB_POOL_MAX,
+    ...DB_POOL_LIMITS,
+  });
+  db.$client.on('error', (error: Error) => {
+    logger.error({ err: error }, 'database pool error');
   });
   const queue = await connectJobQueue(config.AMQP_URL);
 

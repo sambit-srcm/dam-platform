@@ -1,5 +1,6 @@
 import {
   assets,
+  FIELD_LIMITS,
   mergeTags,
   renditions,
   type Db,
@@ -27,7 +28,10 @@ export async function markAssetFailed(
 ) {
   await db
     .update(assets)
-    .set({ status: 'failed', failureReason })
+    .set({
+      status: 'failed',
+      failureReason: failureReason.slice(0, FIELD_LIMITS.failureReason),
+    })
     .where(eq(assets.id, id));
 }
 

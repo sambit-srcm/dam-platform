@@ -29,8 +29,10 @@ export async function getAssets(
   return res.data;
 }
 
-export async function getTags(): Promise<TagCount[]> {
-  const res = await http.get<{ items: TagCount[] }>('/assets/tags');
+export async function getTags(scope?: 'mine' | 'team'): Promise<TagCount[]> {
+  const res = await http.get<{ items: TagCount[] }>('/assets/tags', {
+    params: { scope },
+  });
   return res.data.items;
 }
 

@@ -41,11 +41,11 @@ const adminToken = () => signToken({ id: 'u2', role: 'admin' });
 
 describe('routes that need a login', () => {
   it.each([
-    ['GET', '/assets'],
-    ['GET', '/assets/tags'],
-    ['POST', '/assets/uploads'],
-    ['GET', '/admin/dashboard'],
-    ['GET', '/admin/assets'],
+    ['GET', '/v1/assets'],
+    ['GET', '/v1/assets/tags'],
+    ['POST', '/v1/assets/uploads'],
+    ['GET', '/v1/admin/dashboard'],
+    ['GET', '/v1/admin/assets'],
   ])('%s %s answers 401 without a token', async (method, path) => {
     const res = await fetch(`${base}${path}`, { method });
 
@@ -54,7 +54,7 @@ describe('routes that need a login', () => {
   });
 
   it('answers 401 to a forged token', async () => {
-    const res = await call('/assets', 'not.a.real-token');
+    const res = await call('/v1/assets', 'not.a.real-token');
 
     expect(res.status).toBe(401);
   });
@@ -62,14 +62,14 @@ describe('routes that need a login', () => {
 
 describe('admin routes', () => {
   it('turn away a signed-in normal user with 403', async () => {
-    const res = await call('/admin/dashboard', await userToken());
+    const res = await call('/v1/admin/dashboard', await userToken());
 
     expect(res.status).toBe(403);
     expect((await res.json()).error.code).toBe('forbidden');
   });
 
   it('let an admin through', async () => {
-    const res = await call('/admin/dashboard', await adminToken());
+    const res = await call('/v1/admin/dashboard', await adminToken());
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ reached: true });

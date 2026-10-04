@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
+import { logout } from '../features/auth/api';
 import { useAuthStore } from '../features/auth/store';
 import { navClass } from './navClass';
 
@@ -15,7 +16,15 @@ const HEALTH_STYLES: Record<Health, string> = {
 export function AppLayout() {
   const [health, setHealth] = useState<Health>('checking');
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const clearUser = useAuthStore((state) => state.clearUser);
+
+  async function signOut() {
+    try {
+      await logout();
+    } finally {
+      clearUser();
+    }
+  }
 
   useEffect(() => {
     axios
@@ -45,6 +54,9 @@ export function AppLayout() {
                   <NavLink to="/admin/assets" className={navClass}>
                     All assets
                   </NavLink>
+                  <NavLink to="/admin/teams" className={navClass}>
+                    Teams
+                  </NavLink>
                 </>
               )}
             </nav>
@@ -60,7 +72,7 @@ export function AppLayout() {
             </span>
             <button
               type="button"
-              onClick={logout}
+              onClick={() => void signOut()}
               className="text-sm font-medium text-gray-500 transition hover:text-gray-900"
             >
               Sign out

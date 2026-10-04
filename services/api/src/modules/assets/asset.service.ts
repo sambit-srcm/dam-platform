@@ -10,6 +10,7 @@ import {
   ValidationError,
 } from '../../shared/errors/AppError.ts';
 import { canAccess, type AuthUser } from '../../shared/lib/actor.ts';
+import { hasTeamAccess } from '../teams/team.repository.ts';
 import {
   findAssetById,
   findRenditions,
@@ -50,18 +51,25 @@ export async function presentAsset(ctx: Context, asset: Asset) {
   };
 }
 
-export async function getAsset(ctx: Context, id: string, actor: AuthUser) {
+async function visibleAsset(ctx: Context, id: string, actor: AuthUser) {
   const asset = await findAssetById(ctx.db, id);
   // Someone else's asset looks the same as a missing one, so ids can't be probed
-  if (!asset || !canAccess(actor, asset)) {
-    throw new NotFoundError('Asset not found');
-  }
+  if (!asset) throw new NotFoundError('Asset not found');
+  if (canAccess(actor, asset)) return asset;
+  if (await hasTeamAccess(ctx.db, asset.id, actor.id)) return asset;
+  throw new NotFoundError('Asset not found');
+}
 
-  return presentAsset(ctx, asset);
+export async function getAsset(ctx: Context, id: string, actor: AuthUser) {
+  return presentAsset(ctx, await visibleAsset(ctx, id, actor));
 }
 
 // Everything a gallery card needs, without handing out a download link per row
-export async function presentAssetSummary(ctx: Context, asset: Asset) {
+export async function presentAssetSummary(
+  ctx: Context,
+  asset: Asset,
+  actor?: AuthUser,
+) {
   const ready = HAS_OBJECT.includes(asset.status);
 
   return {
@@ -73,6 +81,12 @@ export async function presentAssetSummary(ctx: Context, asset: Asset) {
     tags: asset.tags,
     createdAt: asset.createdAt,
     thumbnailUrl: ready ? await thumbnailUrl(ctx, asset) : null,
+    ...(actor
+      ? {
+          access:
+            asset.ownerId === actor.id ? ('owner' as const) : ('team' as const),
+        }
+      : {}),
   };
 }
 
@@ -83,12 +97,12 @@ export async function listAssetsPage(
 ) {
   const { rows, total } = await listAssets(ctx.db, {
     ...query,
-    ownerId: actor.id,
+    viewerId: actor.id,
   });
 
   return {
     items: await Promise.all(
-      rows.map((asset) => presentAssetSummary(ctx, asset)),
+      rows.map((asset) => presentAssetSummary(ctx, asset, actor)),
     ),
     total,
     limit: query.limit,
@@ -96,16 +110,16 @@ export async function listAssetsPage(
   };
 }
 
-export function listMyTags(ctx: Context, actor: AuthUser) {
-  return listTags(ctx.db, actor.id);
+export function listMyTags(
+  ctx: Context,
+  actor: AuthUser,
+  scope?: 'mine' | 'team',
+) {
+  return listTags(ctx.db, { userId: actor.id, scope });
 }
 
 export async function downloadAsset(ctx: Context, id: string, actor: AuthUser) {
-  const asset = await findAssetById(ctx.db, id);
-
-  if (!asset || !canAccess(actor, asset)) {
-    throw new NotFoundError('Asset not found');
-  }
+  const asset = await visibleAsset(ctx, id, actor);
   const ready = HAS_OBJECT.includes(asset.status);
   if (!ready) {
     throw new ValidationError('Asset has no file to download');
@@ -172,10 +186,5 @@ export async function presentView(ctx: Context, asset: Asset) {
 }
 
 export async function getAssetView(ctx: Context, id: string, actor: AuthUser) {
-  const asset = await findAssetById(ctx.db, id);
-  if (!asset || !canAccess(actor, asset)) {
-    throw new NotFoundError('Asset not found');
-  }
-
-  return presentView(ctx, asset);
+  return presentView(ctx, await visibleAsset(ctx, id, actor));
 }

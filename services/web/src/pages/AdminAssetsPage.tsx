@@ -38,13 +38,27 @@ export function AssetTable({
       <table className="w-full text-left text-sm">
         <thead className="border-b border-gray-200 bg-gray-50 text-xs text-gray-500">
           <tr>
-            <th className="px-3 py-2 font-medium">Asset</th>
-            <th className="px-3 py-2 font-medium">Tags</th>
-            <th className="px-3 py-2 font-medium">Owner</th>
-            <th className="px-3 py-2 font-medium">Size</th>
-            <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Downloads</th>
-            <th className="px-3 py-2 font-medium">Uploaded</th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Asset
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Tags
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Owner
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Size
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Status
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Downloads
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Uploaded
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -103,7 +117,7 @@ export function AssetTable({
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+              <td colSpan={7} className="px-3 py-8 text-center text-gray-600">
                 No assets match
               </td>
             </tr>
@@ -134,7 +148,11 @@ export function AdminAssetsPage() {
         onChange={update}
       />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
       {!page && !error && <p className="text-sm text-gray-500">Loading…</p>}
 
       {page && (

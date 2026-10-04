@@ -29,6 +29,7 @@ describe('useAssetQuery (filters kept in the address bar)', () => {
       from: undefined,
       to: undefined,
       sort: 'createdAt',
+      scope: 'mine',
     });
     expect(offset).toBe(0);
   });
