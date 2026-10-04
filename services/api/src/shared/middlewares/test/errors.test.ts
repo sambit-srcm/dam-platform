@@ -46,6 +46,39 @@ describe('errorHandler', () => {
     expect(error.message).toContain('age:');
   });
 
+  it.each([
+    ['22001', 'A value is too long'],
+    ['22007', 'A date is invalid'],
+    ['22008', 'A date is out of range'],
+    ['23514', 'A value is not allowed'],
+  ])('turns postgres %s into a 400', (code, message) => {
+    const { req, res, mocks, json } = setup();
+
+    errorHandler(Object.assign(new Error('db'), { code }), req, res, next);
+
+    expect(mocks.status).toHaveBeenCalledWith(400);
+    expect(json).toHaveBeenCalledWith({
+      error: { code: 'validation_error', message, requestId: 'req-1' },
+    });
+  });
+
+  it('reads a postgres code wrapped as the cause', () => {
+    const { req, res, mocks, json } = setup();
+    const error = new Error('wrapped');
+    error.cause = Object.assign(new Error('db'), { code: '22001' });
+
+    errorHandler(error, req, res, next);
+
+    expect(mocks.status).toHaveBeenCalledWith(400);
+    expect(json).toHaveBeenCalledWith({
+      error: {
+        code: 'validation_error',
+        message: 'A value is too long',
+        requestId: 'req-1',
+      },
+    });
+  });
+
   it('hides the details of an unexpected error', () => {
     const { req, res, mocks, json, log } = setup();
 

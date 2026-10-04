@@ -91,9 +91,11 @@ export function AssetFilterBar({
           value={text}
           onChange={(e) => search(e.target.value)}
           placeholder="Search by name or tag"
+          aria-label="Search by name or tag"
           className={`${inputClass} w-56`}
         />
         <select
+          aria-label="Asset type"
           value={filters.type ?? ''}
           onChange={(e) =>
             onChange({ type: (e.target.value || undefined) as AssetKind })
@@ -109,6 +111,7 @@ export function AssetFilterBar({
         </select>
         {showStatus && (
           <select
+            aria-label="Status"
             value={filters.status ?? ''}
             onChange={(e) =>
               onChange({
@@ -146,6 +149,7 @@ export function AssetFilterBar({
           />
         </label>
         <select
+          aria-label="Sort"
           value={filters.sort}
           onChange={(e) => onChange({ sort: e.target.value as AssetSort })}
           className={inputClass}

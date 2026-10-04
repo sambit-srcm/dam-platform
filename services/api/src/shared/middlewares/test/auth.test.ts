@@ -11,8 +11,11 @@ import { requireRole } from '../requireRole.ts';
 const alice = { id: 'u1', role: 'user' as const };
 const admin = { id: 'u2', role: 'admin' as const };
 
-const reqWith = (authorization?: string, user?: typeof alice | typeof admin) =>
-  ({ headers: { authorization }, user }) as unknown as Request;
+const reqWith = (
+  authorization?: string,
+  user?: typeof alice | typeof admin,
+  cookie?: string,
+) => ({ headers: { authorization, cookie }, user }) as unknown as Request;
 const res = {} as Response;
 
 let next: ReturnType<typeof vi.fn> & NextFunction;
@@ -28,6 +31,16 @@ describe('requireAuth', () => {
 
     expect(next).toHaveBeenCalledWith(expect.any(UnauthorizedError));
     expect(verifyToken).not.toHaveBeenCalled();
+  });
+
+  it('accepts the HttpOnly session cookie', async () => {
+    vi.mocked(verifyToken).mockResolvedValue(alice);
+    const req = reqWith(undefined, undefined, 'dam_token=from-cookie');
+
+    await requireAuth(req, res, next);
+
+    expect(verifyToken).toHaveBeenCalledWith('from-cookie');
+    expect(req.user).toEqual(alice);
   });
 
   it('puts the verified user on the request and moves on', async () => {

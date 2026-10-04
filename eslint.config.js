@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier/flat';
+import importX from 'eslint-plugin-import-x';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import { defineConfig, globalIgnores } from 'eslint/config';
@@ -11,6 +12,9 @@ export default defineConfig([
   {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommended],
+    plugins: {
+      'import-x': importX,
+    },
     rules: {
       // Express middleware signatures need unused arguments, e.g. the error handler's next
       '@typescript-eslint/no-unused-vars': [
@@ -19,6 +23,8 @@ export default defineConfig([
       ],
       // Needed to add properties to Express's Request type
       '@typescript-eslint/no-namespace': ['error', { allowDeclarations: true }],
+      // One import per module. Cycle detection needs a resolver this repo does not load.
+      'import-x/no-duplicates': 'error',
     },
   },
   {

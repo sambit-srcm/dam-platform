@@ -70,7 +70,13 @@ export function fakeReq(
 }
 
 export function fakeRes() {
-  const res = { json: vi.fn(), status: vi.fn(), end: vi.fn() };
+  const res = {
+    json: vi.fn(),
+    status: vi.fn(),
+    end: vi.fn(),
+    cookie: vi.fn(),
+    clearCookie: vi.fn(),
+  };
   res.status.mockReturnValue(res);
   return { res: res as unknown as Response, mocks: res };
 }

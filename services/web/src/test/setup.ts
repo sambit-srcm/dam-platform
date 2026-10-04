@@ -8,12 +8,20 @@ const fakeStorage = {
   clear: () => data.clear(),
 };
 
-// The store looks the storage up through `window`, so both names must exist
+// The store looks the storage up through `window`. Keep a real jsdom window
+// when tests ask for one; only invent a stub in the Node environment.
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: fakeStorage,
 });
-Object.defineProperty(globalThis, 'window', {
-  configurable: true,
-  value: { localStorage: fakeStorage },
-});
+if (typeof globalThis.window === 'undefined') {
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { localStorage: fakeStorage },
+  });
+} else {
+  Object.defineProperty(globalThis.window, 'localStorage', {
+    configurable: true,
+    value: fakeStorage,
+  });
+}

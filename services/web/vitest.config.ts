@@ -5,7 +5,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['**/*.test.{ts,tsx}', 'src/test/**', '**/*.d.ts'],
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        'src/test/**',
+        '**/*.d.ts',
+        'src/main.tsx',
+      ],
+      thresholds: {
+        statements: 70,
+        branches: 70,
+        functions: 70,
+        lines: 70,
+      },
       reporter: ['text', 'html'],
     },
     environment: 'node',

@@ -71,7 +71,7 @@ describe('opening one asset', () => {
 });
 
 describe('the gallery list', () => {
-  it('only ever asks for the signed-in person’s own assets', async () => {
+  it('asks for assets the signed-in person owns or that a team shared', async () => {
     vi.mocked(listAssets).mockResolvedValue({ rows: [], total: 0 });
 
     await listAssetsPage(
@@ -81,7 +81,7 @@ describe('the gallery list', () => {
     );
 
     expect(vi.mocked(listAssets).mock.calls[0]![1]).toMatchObject({
-      ownerId: alice.id,
+      viewerId: alice.id,
     });
   });
 
@@ -91,7 +91,10 @@ describe('the gallery list', () => {
     await expect(listMyTags(h.ctx, alice)).resolves.toEqual([
       { tag: 'beach', count: 2 },
     ]);
-    expect(vi.mocked(listTags).mock.calls[0]![1]).toBe(alice.id);
+    expect(vi.mocked(listTags).mock.calls[0]![1]).toEqual({
+      userId: alice.id,
+      scope: undefined,
+    });
   });
 });
 

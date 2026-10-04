@@ -28,7 +28,7 @@ function Breakdown({
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-medium text-gray-500">{title}</h3>
       {entries.length === 0 ? (
-        <p className="text-sm text-gray-400">Nothing yet</p>
+        <p className="text-sm text-gray-600">Nothing yet</p>
       ) : (
         <ul className="space-y-1 text-sm">
           {entries.map(([key, count]) => (
@@ -64,7 +64,7 @@ function AssetList({
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-medium text-gray-500">{title}</h3>
       {items.length === 0 ? (
-        <p className="text-sm text-gray-400">{empty}</p>
+        <p className="text-sm text-gray-600">{empty}</p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {items.map((asset) => (
@@ -114,7 +114,7 @@ function DayChart({
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-medium text-gray-500">{title}</h3>
       {!available ? (
-        <p className="py-10 text-center text-sm text-gray-400">Unavailable</p>
+        <p className="py-10 text-center text-sm text-gray-600">Unavailable</p>
       ) : (
         <div className="flex h-32 items-end gap-1">
           {days.map((day, i) => (
@@ -131,7 +131,7 @@ function DayChart({
           ))}
         </div>
       )}
-      <div className="mt-2 flex justify-between text-xs text-gray-400">
+      <div className="mt-2 flex justify-between text-xs text-gray-600">
         <span>{days[0]?.day}</span>
         <span>{days[days.length - 1]?.day}</span>
       </div>
@@ -243,7 +243,13 @@ export function AdminDashboardPage() {
     };
   }, [days]);
 
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (error) {
+    return (
+      <p role="alert" className="text-sm text-red-600">
+        {error}
+      </p>
+    );
+  }
   if (!data) return <p className="text-sm text-gray-500">Loading…</p>;
 
   return <DashboardView data={data} days={days} onDaysChange={setDays} />;

@@ -87,7 +87,7 @@ describe('tag list endpoint', () => {
 
     await listTagsController(ctx)(fakeReq({ user: alice }).req, res);
 
-    expect(listMyTags).toHaveBeenCalledWith(ctx, alice);
+    expect(listMyTags).toHaveBeenCalledWith(ctx, alice, undefined);
     expect(mocks.json).toHaveBeenCalledWith({
       items: [{ tag: 'sea', count: 2 }],
     });

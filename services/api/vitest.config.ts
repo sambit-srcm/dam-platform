@@ -6,7 +6,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['**/*.test.ts', 'src/test/**', '**/*.d.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.integration.ts',
+        'src/test/**',
+        '**/*.d.ts',
+      ],
+      thresholds: {
+        statements: 50,
+        branches: 50,
+        functions: 40,
+        lines: 50,
+      },
       reporter: ['text', 'html'],
     },
     // Fake settings, so no test can reach a real database or bucket

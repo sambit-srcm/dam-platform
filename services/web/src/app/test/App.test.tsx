@@ -3,11 +3,11 @@ import { StaticRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({
-  state: { token: null, user: null } as {
-    token: string | null;
+  state: { user: null, ready: true } as {
     user: { email: string; role: string } | null;
-    setSession: () => void;
-    logout: () => void;
+    ready: boolean;
+    setUser: () => void;
+    clearUser: () => void;
   },
 }));
 
@@ -21,10 +21,10 @@ import { App } from '../App';
 const noop = () => {};
 const signedInAs = (role: string) => {
   session.state = {
-    token: 't',
     user: { email: `${role}@example.com`, role },
-    setSession: noop,
-    logout: noop,
+    ready: true,
+    setUser: noop,
+    clearUser: noop,
   };
 };
 
@@ -36,7 +36,7 @@ const open = (path: string) =>
   );
 
 beforeEach(() => {
-  session.state = { token: null, user: null, setSession: noop, logout: noop };
+  session.state = { user: null, ready: true, setUser: noop, clearUser: noop };
 });
 
 describe('which screen each address shows', () => {

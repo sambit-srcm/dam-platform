@@ -53,7 +53,10 @@ export async function register(
     return withToken(user);
   } catch (error) {
     if (isUniqueViolation(error)) {
-      throw new ConflictError('An account with this email already exists');
+      throw new ConflictError(
+        'An account with this email already exists',
+        error,
+      );
     }
     throw error;
   }

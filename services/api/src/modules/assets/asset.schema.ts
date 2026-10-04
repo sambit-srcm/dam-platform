@@ -24,6 +24,8 @@ export const assetFilters = {
   from: z.iso.date().optional(),
   to: z.iso.date().optional(),
   sort: z.enum(['createdAt', 'downloadCount']).default('createdAt'),
+  // mine: files you uploaded. team: files a team you belong to was granted, excluding your own.
+  scope: z.enum(['mine', 'team']).optional(),
 };
 
 export const page = {

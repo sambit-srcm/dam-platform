@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
   title: DAM Platform API
-  version: 0.1.0
+  version: 1.0.0
   description: |
     REST API of the DAM platform: accounts, asset browsing, direct-to-storage
     multipart uploads, and admin reporting.
 
     **Base URL.** Through the web container's nginx the API lives under `/api`
     (`http://localhost:8080/api`), and nginx strips that prefix. The API
-    container also publishes port 3000 directly. Paths below have no prefix.
+    container also publishes port 3000 directly. Resource paths are versioned
+    under `/v1`. `/health` and `/docs` are not versioned.
 
-    **Authentication.** Everything except `/health/*` and `/auth/register`,
-    `/auth/login` needs `Authorization: Bearer <token>`, with a token from
-    register or login.
+    **Authentication.** Register and login set an HttpOnly cookie named
+    `dam_token`. Page scripts cannot read it. The JSON body contains the user
+    and not the token. The browser sends the cookie on later requests.
+    `SameSite=Strict` keeps other sites from attaching it. A non-browser client
+    may instead send `Authorization: Bearer <token>`. Everything except
+    `/health/*`, `/docs`, `/v1/auth/register`, `/v1/auth/login`,
+    `/v1/auth/logout` and `/v1/shares/{token}` requires one of those. A share
+    link is the credential for that one asset.
 
-    **Ownership.** A user only sees their own assets. Someone else's asset
-    answers `404`, exactly like a missing one, so ids cannot be probed.
-    Admins use the `/admin` routes to see every asset.
+    **CORS.** Browsers may call the API only from origins listed in
+    `CORS_ORIGIN` (comma-separated). The default is
+    `http://localhost:5173,http://localhost:8080`.
+
+    **Ownership.** A user sees assets they own and assets a team they belong
+    to was granted. Someone else's asset answers `404`, exactly like a missing
+    one, so ids cannot be probed. Admins use the `/v1/admin` routes to see
+    every asset. A share link is a separate credential: `GET /v1/shares/{token}`
+    and `POST /v1/shares/{token}/download` need no account. The token is shown
+    once and stored only as a hash.
 
     **Rate limits.** Requests are counted per client address, and per user once
     signed in. Failed sign-ins are counted per account too. Going over a limit
@@ -44,8 +57,13 @@ tags:
   - name: Uploads
     description: Resumable multipart upload straight to object storage.
   - name: Admin
-    description: Read-only reporting across all users. Needs the admin role.
+    description: Reporting across all users, plus creating and maintaining teams. Needs the admin role.
+  - name: Teams
+    description: Teams the caller belongs to. Admins create teams and add members.
+  - name: Shares
+    description: Public preview and download with a share token. No account.
 security:
+  - cookieAuth: []
   - bearerAuth: []
 paths:
   /health:
@@ -104,7 +122,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Readiness'
-  /auth/register:
+  /v1/auth/register:
     post:
       operationId: register
       tags: [Auth]
@@ -131,7 +149,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-  /auth/login:
+  /v1/auth/login:
     post:
       operationId: login
       tags: [Auth]
@@ -157,7 +175,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
-  /auth/me:
+  /v1/auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Sign out
+      description: Clears the session cookie. Safe to call when already signed out.
+      security: []
+      responses:
+        '204':
+          description: The cookie is cleared.
+  /v1/auth/me:
     get:
       operationId: getMe
       tags: [Auth]
@@ -174,12 +202,15 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-  /assets:
+  /v1/assets:
     get:
       operationId: listAssets
       tags: [Assets]
       summary: List your assets
-      description: Newest first. Filters combine, and `tags` must all match.
+      description: |
+        Newest first. Filters combine, and `tags` must all match.
+        `scope=mine` is your uploads. `scope=team` is assets granted to a team
+        you belong to, including ones you added. Omit `scope` to get both.
       parameters:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Offset'
@@ -190,6 +221,7 @@ paths:
         - $ref: '#/components/parameters/From'
         - $ref: '#/components/parameters/To'
         - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Scope'
       responses:
         '200':
           description: One page of assets.
@@ -208,12 +240,14 @@ paths:
                   offset: { type: integer }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-  /assets/tags:
+  /v1/assets/tags:
     get:
       operationId: listTags
       tags: [Assets]
       summary: Your most used tags
-      description: Up to 100 tags, most used first.
+      description: Up to 100 tags, most used first. `scope` matches the gallery list.
+      parameters:
+        - $ref: '#/components/parameters/Scope'
       responses:
         '200':
           description: Tags with how many of your assets carry them.
@@ -221,7 +255,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TagList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-  /assets/{assetId}:
+  /v1/assets/{assetId}:
     get:
       operationId: getAsset
       tags: [Assets]
@@ -237,7 +271,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/{assetId}/view:
+  /v1/assets/{assetId}/view:
     get:
       operationId: getAssetView
       tags: [Assets]
@@ -261,7 +295,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/{assetId}/download:
+  /v1/assets/{assetId}/download:
     post:
       operationId: downloadAsset
       tags: [Assets]
@@ -288,7 +322,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/uploads:
+  /v1/assets/uploads:
     post:
       operationId: startUpload
       tags: [Uploads]
@@ -323,7 +357,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '503': { $ref: '#/components/responses/Unavailable' }
-  /assets/uploads/{assetId}:
+  /v1/assets/uploads/{assetId}:
     parameters:
       - $ref: '#/components/parameters/AssetId'
     get:
@@ -352,7 +386,7 @@ paths:
         '400': { $ref: '#/components/responses/UploadClosed' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/uploads/{assetId}/parts:
+  /v1/assets/uploads/{assetId}/parts:
     post:
       operationId: signUploadParts
       tags: [Uploads]
@@ -401,7 +435,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/uploads/{assetId}/parts/recorded:
+  /v1/assets/uploads/{assetId}/parts/recorded:
     post:
       operationId: recordUploadedPart
       tags: [Uploads]
@@ -421,7 +455,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /assets/uploads/{assetId}/complete:
+  /v1/assets/uploads/{assetId}/complete:
     post:
       operationId: completeUpload
       tags: [Uploads]
@@ -451,7 +485,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/Unavailable' }
-  /admin/dashboard:
+  /v1/admin/dashboard:
     get:
       operationId: adminDashboard
       tags: [Admin]
@@ -470,7 +504,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /admin/assets:
+  /v1/admin/assets:
     get:
       operationId: adminListAssets
       tags: [Admin]
@@ -507,7 +541,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /admin/assets/{assetId}:
+  /v1/admin/assets/{assetId}:
     get:
       operationId: adminGetAsset
       tags: [Admin]
@@ -525,7 +559,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /admin/tags:
+  /v1/admin/tags:
     get:
       operationId: adminListTags
       tags: [Admin]
@@ -538,19 +572,280 @@ paths:
               schema: { $ref: '#/components/schemas/TagList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/teams:
+    get:
+      operationId: listAllTeams
+      tags: [Admin]
+      summary: Every team
+      responses:
+        '200':
+          description: All teams.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Team' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createTeam
+      tags: [Admin]
+      summary: Create a team
+      description: Admins only. Creating a team does not add the admin as a member.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTeam' }
+      responses:
+        '201':
+          description: The new team.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Team' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/teams/{teamId}/members:
+    get:
+      operationId: listTeamMembers
+      tags: [Admin]
+      summary: Members of a team
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '200':
+          description: Members.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TeamMember' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: addTeamMember
+      tags: [Admin]
+      summary: Add a member by email
+      description: Admins only. The email must already have an account.
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        '201':
+          description: The new member.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamMember' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/admin/teams/{teamId}/members/{userId}:
+    delete:
+      operationId: removeTeamMember
+      tags: [Admin]
+      summary: Remove a member
+      description: Admins only.
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204': { description: Removed. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/teams:
+    get:
+      operationId: listTeams
+      tags: [Teams]
+      summary: Teams the caller belongs to
+      description: Used when granting an asset. Does not include teams the caller merely administers.
+      responses:
+        '200':
+          description: The caller's teams.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Team' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/assets/{assetId}/sharing:
+    get:
+      operationId: listAssetSharing
+      tags: [Assets]
+      summary: Teams and links for an asset the caller owns
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      responses:
+        '200':
+          description: Grants and links. The raw token is not included.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AssetSharing' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/assets/{assetId}/teams/{teamId}:
+    put:
+      operationId: grantAssetToTeam
+      tags: [Assets]
+      summary: Let a team preview and download an asset
+      description: The caller must own the asset and belong to the team.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '204': { description: Granted. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: revokeAssetFromTeam
+      tags: [Assets]
+      summary: Remove a team's access to an asset
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '204': { description: Revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/assets/{assetId}/shares:
+    post:
+      operationId: createShareLink
+      tags: [Assets]
+      summary: Create a share link
+      description: |
+        The raw token is returned once. Expiry must be in the future and within
+        30 days. Download is off unless `canDownload` is true.
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateShare' }
+      responses:
+        '201':
+          description: The link, including the token this one time.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedShare' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/assets/{assetId}/shares/{shareId}:
+    delete:
+      operationId: revokeShareLink
+      tags: [Assets]
+      summary: Revoke a share link
+      parameters:
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/ShareId'
+      responses:
+        '204': { description: Revoked. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/shares/{token}:
+    get:
+      operationId: previewShare
+      tags: [Shares]
+      summary: Preview an asset with a share link
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: Filename, whether download is allowed, and a short-lived view.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SharePreview' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/shares/{token}/download:
+    post:
+      operationId: downloadShare
+      tags: [Shares]
+      summary: Download through a share link
+      description: Counts as a download. Refused when the link does not allow it.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ShareToken'
+      responses:
+        '200':
+          description: A short-lived download URL.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
 components:
   securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: dam_token
+      description: |
+        HttpOnly session cookie set by register and login. Expires with the
+        token (one hour by default). Not readable by page scripts.
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: HS256 token from register or login. Expires after one hour by default.
+      description: |
+        Same token, for clients that are not a browser. The web app does not
+        use this. Expires after one hour by default.
   parameters:
     AssetId:
       name: assetId
       in: path
       required: true
       schema: { type: string, format: uuid }
+    TeamId:
+      name: teamId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ShareId:
+      name: shareId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ShareToken:
+      name: token
+      in: path
+      required: true
+      description: The raw share token. It is not written to request logs.
+      schema: { type: string, minLength: 20, maxLength: 128 }
     Limit:
       name: limit
       in: query
@@ -587,6 +882,13 @@ components:
       in: query
       description: Last day included, as `YYYY-MM-DD` (UTC).
       schema: { type: string, format: date }
+    Scope:
+      name: scope
+      in: query
+      description: |
+        `mine` is assets you uploaded. `team` is assets granted to a team you
+        belong to, including ones you added yourself. Omit it to get both.
+      schema: { type: string, enum: [mine, team] }
     Sort:
       name: sort
       in: query
@@ -596,7 +898,10 @@ components:
         default: createdAt
   responses:
     ValidationError:
-      description: The request did not pass validation. The message lists each field.
+      description: |
+        The request did not pass validation. A body or query problem lists each
+        field. A value the database rejects for length, format or a check
+        returns the same code with a generic message and no internal detail.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -615,7 +920,9 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: The signed-in user is not an admin.
+      description: Signed in, but not allowed to do this.
+    Conflict:
+      description: The change clashes with something that already exists.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -651,6 +958,7 @@ components:
                 - forbidden
                 - not_found
                 - conflict
+                - too_many_requests
                 - service_unavailable
                 - internal_error
             message: { type: string }
@@ -678,13 +986,17 @@ components:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email, description: Stored lowercased. }
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Stored lowercased. At most 254 characters.
         password: { type: string, minLength: 8, maxLength: 128 }
     LoginRequest:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email }
+        email: { type: string, format: email, maxLength: 254 }
         password: { type: string, minLength: 1, maxLength: 128 }
     User:
       type: object
@@ -696,9 +1008,11 @@ components:
         createdAt: { type: string, format: date-time }
     AuthResult:
       type: object
-      required: [token, user]
+      required: [user]
+      description: |
+        The session token is set as the `dam_token` cookie and is not included
+        in this body.
       properties:
-        token: { type: string }
         user: { $ref: '#/components/schemas/User' }
     AssetStatus:
       type: string
@@ -738,8 +1052,8 @@ components:
         ]
       properties:
         id: { type: string, format: uuid }
-        filename: { type: string }
-        mimeType: { type: string }
+        filename: { type: string, maxLength: 255 }
+        mimeType: { type: string, maxLength: 255 }
         sizeBytes: { type: integer, format: int64 }
         status: { $ref: '#/components/schemas/AssetStatus' }
         tags: { type: array, items: { type: string } }
@@ -748,6 +1062,12 @@ components:
           type: [string, 'null']
           format: uri
           description: Presigned link, null until a thumbnail exists.
+        access:
+          type: string
+          enum: [owner, team]
+          description: |
+            Present on the gallery list. `owner` can grant teams and create
+            links. `team` can preview and download.
     Asset:
       allOf:
         - $ref: '#/components/schemas/AssetSummary'
@@ -757,6 +1077,7 @@ components:
             ownerId: { type: [string, 'null'], format: uuid }
             failureReason:
               type: [string, 'null']
+              maxLength: 500
               description: |
                 Set when `status` is `failed`, for example `upload_expired`,
                 `cancelled_by_user`, `cancelled_by_admin`, `queue_unavailable`,
@@ -830,6 +1151,7 @@ components:
         filename: { type: string, minLength: 1, maxLength: 255 }
         mimeType:
           type: string
+          maxLength: 255
           description: '`image/*`, `video/*` or `application/pdf`.'
         size:
           type: integer
@@ -917,8 +1239,81 @@ components:
               [id, filename, mimeType, downloadCount, ownerEmail, thumbnailUrl]
             properties:
               id: { type: string, format: uuid }
-              filename: { type: string }
-              mimeType: { type: string }
+              filename: { type: string, maxLength: 255 }
+              mimeType: { type: string, maxLength: 255 }
               downloadCount: { type: integer }
               ownerEmail: { type: [string, 'null'], format: email }
               thumbnailUrl: { type: [string, 'null'], format: uri }
+    Team:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 80 }
+        createdAt: { type: string, format: date-time }
+    CreateTeam:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+    TeamMember:
+      type: object
+      required: [userId, email]
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+    AssetGrant:
+      type: object
+      required: [teamId, teamName, createdAt]
+      properties:
+        teamId: { type: string, format: uuid }
+        teamName: { type: string }
+        createdAt: { type: string, format: date-time }
+    ShareLinkSummary:
+      type: object
+      required: [id, canDownload, expiresAt, revokedAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        canDownload: { type: boolean }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+    AssetSharing:
+      type: object
+      required: [teams, links]
+      properties:
+        teams:
+          type: array
+          items: { $ref: '#/components/schemas/AssetGrant' }
+        links:
+          type: array
+          items: { $ref: '#/components/schemas/ShareLinkSummary' }
+    CreateShare:
+      type: object
+      required: [expiresAt]
+      properties:
+        canDownload: { type: boolean, default: false }
+        expiresAt:
+          type: string
+          format: date-time
+          description: Must be in the future and at most 30 days ahead.
+    CreatedShare:
+      type: object
+      required: [id, token, canDownload, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        token:
+          type: string
+          description: Shown once. Later responses only keep a hash.
+        canDownload: { type: boolean }
+        expiresAt: { type: string, format: date-time }
+    SharePreview:
+      type: object
+      required: [filename, mimeType, canDownload, expiresAt, asset, view]
+      properties:
+        filename: { type: string }
+        mimeType: { type: string }
+        canDownload: { type: boolean }
+        expiresAt: { type: string, format: date-time }
+        asset: { $ref: '#/components/schemas/AssetSummary' }
+        view: { $ref: '#/components/schemas/AssetView' }

@@ -48,7 +48,9 @@ export function UploadList({
           )}
           {item.error && (
             <div className="mt-1 flex items-center justify-between gap-4">
-              <p className="text-xs text-red-600">{item.error}</p>
+              <p role="alert" className="text-xs text-red-600">
+                {item.error}
+              </p>
               {onRetry && item.state === 'error' && item.assetId && (
                 <button
                   type="button"

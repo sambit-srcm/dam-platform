@@ -40,25 +40,26 @@ function fakeServer(status: number, body: unknown = {}) {
 }
 
 beforeEach(() => {
-  useAuthStore.setState({ token: null, user: null });
+  useAuthStore.setState({ user: null, ready: true });
 });
 
 describe('sending requests', () => {
-  it('talks to the /api address', async () => {
+  it('talks to the versioned /api address', async () => {
     const sent = fakeServer(200);
     await http.get('/assets');
-    expect(http.defaults.baseURL).toBe('/api');
+    expect(http.defaults.baseURL).toBe('/api/v1');
     expect(sent[0]!.url).toBe('/assets');
   });
 
-  it('attaches the sign-in token when the user is signed in', async () => {
-    useAuthStore.setState({ token: 'my-token', user });
+  it('sends the session cookie instead of a bearer token', async () => {
+    useAuthStore.setState({ user, ready: true });
     const sent = fakeServer(200);
     await http.get('/assets');
-    expect(sent[0]!.headers.Authorization).toBe('Bearer my-token');
+    expect(sent[0]!.withCredentials).toBe(true);
+    expect(sent[0]!.headers.Authorization).toBeUndefined();
   });
 
-  it('sends no token when nobody is signed in', async () => {
+  it('sends no bearer token when nobody is signed in', async () => {
     const sent = fakeServer(200);
     await http.get('/assets');
     expect(sent[0]!.headers.Authorization).toBeUndefined();
@@ -67,17 +68,16 @@ describe('sending requests', () => {
 
 describe('when the server says the token is no good (401)', () => {
   it('signs the user out', async () => {
-    useAuthStore.setState({ token: 'old-token', user });
+    useAuthStore.setState({ user, ready: true });
     fakeServer(401);
 
     await expect(http.get('/assets')).rejects.toThrow();
 
-    expect(useAuthStore.getState().token).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
   });
 
   it('still lets the caller see the error', async () => {
-    useAuthStore.setState({ token: 'old-token', user });
+    useAuthStore.setState({ user, ready: true });
     fakeServer(401, { error: { message: 'Token expired' } });
 
     const error = await http.get('/assets').catch((e: unknown) => e);
@@ -90,27 +90,27 @@ describe('when the server says the token is no good (401)', () => {
 
     await expect(http.post('/auth/login')).rejects.toThrow();
 
-    expect(useAuthStore.getState().token).toBeNull();
+    expect(useAuthStore.getState().user).toBeNull();
   });
 });
 
 describe('other failures', () => {
   it('keeps the user signed in after a 403', async () => {
-    useAuthStore.setState({ token: 'good-token', user });
+    useAuthStore.setState({ user, ready: true });
     fakeServer(403);
 
     await expect(http.get('/admin/assets')).rejects.toThrow();
 
-    expect(useAuthStore.getState().token).toBe('good-token');
+    expect(useAuthStore.getState().user).toEqual(user);
   });
 
   it('keeps the user signed in after a server error', async () => {
-    useAuthStore.setState({ token: 'good-token', user });
+    useAuthStore.setState({ user, ready: true });
     fakeServer(500);
 
     await expect(http.get('/assets')).rejects.toThrow();
 
-    expect(useAuthStore.getState().token).toBe('good-token');
+    expect(useAuthStore.getState().user).toEqual(user);
   });
 });
 

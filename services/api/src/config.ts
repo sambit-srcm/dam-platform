@@ -43,6 +43,11 @@ const schema = z.object({
   // Signs login tokens; generate with `openssl rand -hex 32`
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN_SECONDS: z.coerce.number().default(60 * 60), // 1 hour
+  // Auth cookies are only marked Secure when the site is served over HTTPS
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 
   MINIO_ENDPOINT: z.string(),
   MINIO_API_PORT: z.coerce.number().default(9000),

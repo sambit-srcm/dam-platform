@@ -101,6 +101,16 @@ describe('gallery with a list', () => {
     search.result = { page: { items: [asset()], total: 40 }, error: null };
     expect(show(<GalleryPage />)).toContain('40');
   });
+
+  it('says nothing has been shared on an empty team gallery', () => {
+    search.result = { page: { items: [], total: 0 }, error: null };
+    const html = renderToStaticMarkup(
+      <StaticRouter location="/?scope=team">
+        <GalleryPage />
+      </StaticRouter>,
+    );
+    expect(html).toContain('Nothing has been shared with your teams');
+  });
 });
 
 describe('admin table with a list', () => {

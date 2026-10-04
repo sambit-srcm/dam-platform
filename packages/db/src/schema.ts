@@ -1,9 +1,12 @@
 import {
   bigint,
+  boolean,
+  check,
   index,
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -11,7 +14,7 @@ import {
   unique,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { ASSET_STATUSES, USER_ROLES } from './constants.ts';
+import { ASSET_STATUSES, FIELD_LIMITS, USER_ROLES } from './constants.ts';
 
 export type UploadedSession = {
   uploadId: string;
@@ -38,18 +41,31 @@ export type AssetMetadata = ImageMetadata | VideoMetadata;
 export const assetStatus = pgEnum('asset_status', ASSET_STATUSES);
 export const userRole = pgEnum('user_role', USER_ROLES);
 
-export const users = pgTable('users', {
-  id: uuid().primaryKey().defaultRandom(),
-  // Stored lowercased, so the unique constraint is case-insensitive
-  email: text().notNull().unique('users_email_unique'),
-  passwordHash: text().notNull(),
-  role: userRole().notNull().default('user'),
-  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp({ withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    // Stored lowercased, so the unique constraint is case-insensitive
+    email: text().notNull().unique('users_email_unique'),
+    passwordHash: text().notNull(),
+    role: userRole().notNull().default('user'),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    check(
+      'users_email_length',
+      sql`char_length(${table.email}) <= ${sql.raw(String(FIELD_LIMITS.email))}`,
+    ),
+    check(
+      'users_password_hash_length',
+      sql`char_length(${table.passwordHash}) <= ${sql.raw(String(FIELD_LIMITS.passwordHash))}`,
+    ),
+  ],
+);
 
 export const assets = pgTable(
   'assets',
@@ -94,6 +110,27 @@ export const assets = pgTable(
       'gin',
       table.filename.op('gin_trgm_ops'),
     ),
+    check(
+      'assets_filename_length',
+      sql`char_length(${table.filename}) <= ${sql.raw(String(FIELD_LIMITS.filename))}`,
+    ),
+    check(
+      'assets_mime_type_length',
+      sql`char_length(${table.mimeType}) <= ${sql.raw(String(FIELD_LIMITS.mimeType))}`,
+    ),
+    check(
+      'assets_storage_key_length',
+      sql`char_length(${table.storageKey}) <= ${sql.raw(String(FIELD_LIMITS.storageKey))}`,
+    ),
+    check(
+      'assets_thumbnail_key_length',
+      sql`${table.thumbnailKey} is null or char_length(${table.thumbnailKey}) <= ${sql.raw(String(FIELD_LIMITS.storageKey))}`,
+    ),
+    check(
+      'assets_failure_reason_length',
+      sql`${table.failureReason} is null or char_length(${table.failureReason}) <= ${sql.raw(String(FIELD_LIMITS.failureReason))}`,
+    ),
+    check('assets_tags_length', sql`tags_within_limit(${table.tags})`),
   ],
 );
 
@@ -117,6 +154,18 @@ export const renditions = pgTable(
   // One row per size, so a retried job replaces its rendition instead of adding another
   (table) => [
     unique('renditions_asset_label_unique').on(table.assetId, table.label),
+    check(
+      'renditions_label_length',
+      sql`char_length(${table.label}) <= ${sql.raw(String(FIELD_LIMITS.renditionLabel))}`,
+    ),
+    check(
+      'renditions_storage_key_length',
+      sql`char_length(${table.storageKey}) <= ${sql.raw(String(FIELD_LIMITS.storageKey))}`,
+    ),
+    check(
+      'renditions_mime_type_length',
+      sql`char_length(${table.mimeType}) <= ${sql.raw(String(FIELD_LIMITS.mimeType))}`,
+    ),
   ],
 );
 
@@ -128,3 +177,81 @@ export type NewAsset = typeof assets.$inferInsert;
 
 export type Rendition = typeof renditions.$inferSelect;
 export type NewRendition = typeof renditions.$inferInsert;
+
+export const teams = pgTable(
+  'teams',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      'teams_name_length',
+      sql`char_length(${table.name}) between 1 and ${sql.raw(String(FIELD_LIMITS.teamName))}`,
+    ),
+  ],
+);
+
+export const teamMembers = pgTable(
+  'team_members',
+  {
+    teamId: uuid()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.teamId, table.userId] }),
+    index('team_members_user_id_idx').on(table.userId),
+  ],
+);
+
+// A team may preview and download an asset the owner shared with them
+export const assetTeamGrants = pgTable(
+  'asset_team_grants',
+  {
+    assetId: uuid()
+      .notNull()
+      .references(() => assets.id, { onDelete: 'cascade' }),
+    teamId: uuid()
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    grantedBy: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.teamId] }),
+    index('asset_team_grants_team_id_idx').on(table.teamId),
+  ],
+);
+
+// The raw token is shown once. Only its hash is stored.
+export const shareLinks = pgTable(
+  'share_links',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    assetId: uuid()
+      .notNull()
+      .references(() => assets.id, { onDelete: 'cascade' }),
+    tokenHash: text().notNull().unique('share_links_token_hash_unique'),
+    canDownload: boolean().notNull().default(false),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    revokedAt: timestamp({ withTimezone: true }),
+    createdBy: uuid()
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('share_links_asset_id_idx').on(table.assetId)],
+);
+
+export type Team = typeof teams.$inferSelect;
+export type TeamMember = typeof teamMembers.$inferSelect;
+export type AssetTeamGrant = typeof assetTeamGrants.$inferSelect;
+export type ShareLink = typeof shareLinks.$inferSelect;

@@ -8,9 +8,9 @@ import { RequireAuth } from '../RequireAuth';
 // Server-side rendering always reads the store's starting state, so the real store
 // can't play a signed-in user here. This stand-in lets each test choose who is signed in.
 const session = vi.hoisted(() => ({
-  state: { token: null, user: null } as {
-    token: string | null;
+  state: { user: null, ready: true } as {
     user: { role: string } | null;
+    ready: boolean;
   },
 }));
 
@@ -27,7 +27,7 @@ const person = (role: AuthUser['role']): AuthUser => ({
 });
 
 const signIn = (role: AuthUser['role']) => {
-  session.state = { token: 'token', user: person(role) };
+  session.state = { user: person(role), ready: true };
 };
 
 // Opens the given address inside the guard and reports what ends up on screen
@@ -46,7 +46,7 @@ function visit(guard: 'auth' | 'admin', path: string) {
 }
 
 beforeEach(() => {
-  session.state = { token: null, user: null };
+  session.state = { user: null, ready: true };
 });
 
 describe('RequireAuth (pages for signed-in users)', () => {

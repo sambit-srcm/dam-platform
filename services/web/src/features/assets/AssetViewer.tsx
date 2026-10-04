@@ -99,7 +99,7 @@ export function ViewerBody({
         <p className="py-16 text-center text-sm text-gray-500">Loading…</p>
       )}
       {state.status === 'error' && (
-        <p className="py-16 text-center text-sm text-red-600">
+        <p role="alert" className="py-16 text-center text-sm text-red-600">
           {state.message}
         </p>
       )}

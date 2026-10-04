@@ -14,6 +14,8 @@ import { authRoutes } from './modules/auth/auth.routes.ts';
 import { requireAuth } from './shared/middlewares/requireAuth.ts';
 import { uploadRoutes } from './modules/uploads/upload.routes.ts';
 import { adminRoutes } from './modules/admin/admin.routes.ts';
+import { publicShareRoutes } from './modules/shares/share.routes.ts';
+import { teamRoutes } from './modules/teams/team.routes.ts';
 
 export function createApp(ctx: Context) {
   const app = express();
@@ -33,6 +35,7 @@ export function createApp(ctx: Context) {
     cors({
       origin: config.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      credentials: true,
       allowedHeaders: ['Authorization', 'Content-Type'],
       maxAge: 600,
     }),
@@ -42,20 +45,25 @@ export function createApp(ctx: Context) {
   app.use(limiters.global);
   app.use(express.json({ limit: '1mb' }));
 
-  // Public: probes and nginx need health without a login, people need /auth to get one, and the docs are open to read
+  // Probes and the spec stay unversioned. Everything else is under /v1.
   app.use('/health', healthRoutes(ctx));
-  app.post('/auth/login', limiters.loginByAddress, limiters.loginByAccount);
-  app.post('/auth/register', limiters.register);
-  app.use('/auth', authRoutes(ctx));
   app.use('/docs', docsRoutes());
 
-  app.use(requireAuth);
-  app.use(limiters.perUser);
+  const v1 = express.Router();
+  v1.post('/auth/login', limiters.loginByAddress, limiters.loginByAccount);
+  v1.post('/auth/register', limiters.register);
+  v1.use('/auth', authRoutes(ctx));
+  v1.use('/shares', publicShareRoutes(ctx));
 
-  app.post('/assets/uploads', limiters.uploadStart);
-  app.use('/assets/uploads', uploadRoutes(ctx));
-  app.use('/assets', assetRoutes(ctx));
-  app.use('/admin', adminRoutes(ctx));
+  v1.use(requireAuth);
+  v1.use(limiters.perUser);
+  v1.use('/teams', teamRoutes(ctx));
+
+  v1.post('/assets/uploads', limiters.uploadStart);
+  v1.use('/assets/uploads', uploadRoutes(ctx));
+  v1.use('/assets', assetRoutes(ctx));
+  v1.use('/admin', adminRoutes(ctx));
+  app.use('/v1', v1);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

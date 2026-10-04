@@ -1,7 +1,17 @@
 import type { NextFunction, Request, Response } from 'express';
 import { UnauthorizedError } from '../errors/AppError.ts';
 import type { AuthUser } from '../lib/actor.ts';
+import { readAuthCookie } from '../lib/authCookie.ts';
 import { verifyToken } from '../lib/token.ts';
+
+function presentedToken(req: Request) {
+  const cookie = readAuthCookie(req);
+  if (cookie) return cookie;
+
+  const [scheme, token] = req.headers.authorization?.split(' ') ?? [];
+  if (scheme === 'Bearer' && token) return token;
+  return undefined;
+}
 
 declare global {
   namespace Express {
@@ -11,15 +21,15 @@ declare global {
   }
 }
 
-// Expects "Authorization: Bearer <token>" and fills req.user from it
+// The browser sends the HttpOnly cookie. A non-browser client may still send a bearer token.
 export async function requireAuth(
   req: Request,
   _res: Response,
   next: NextFunction,
 ) {
-  const [scheme, token] = req.headers.authorization?.split(' ') ?? [];
-  if (scheme !== 'Bearer' || !token) {
-    return next(new UnauthorizedError('Missing bearer token'));
+  const token = presentedToken(req);
+  if (!token) {
+    return next(new UnauthorizedError('Authentication required'));
   }
 
   try {
