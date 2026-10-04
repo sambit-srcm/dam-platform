@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   getAssets,
   getAssetView,
@@ -13,6 +13,10 @@ import { TagList } from '../features/assets/TagList';
 import { useAssetQuery } from '../features/assets/useAssetQuery';
 import { useAssetSearch } from '../features/assets/useAssetSearch';
 import { formatSize } from '../lib/format';
+import { AddToTeam } from '../features/shares/AddToTeam';
+import { ShareLinkButton } from '../features/shares/ShareLinkButton';
+import { SharePanel } from '../features/shares/SharePanel';
+import { listTeams, type Team } from '../features/teams/api';
 import { getErrorMessage } from '../lib/http';
 import type { Asset } from '../features/assets/types';
 
@@ -21,9 +25,13 @@ const isPending = (asset: Asset) =>
 
 export function AssetGrid({
   items,
+  teams,
+  shareLinks,
   onSelect,
 }: {
   items: Asset[];
+  teams?: Team[];
+  shareLinks?: boolean;
   onSelect: (asset: Asset) => void;
 }) {
   return (
@@ -47,7 +55,7 @@ export function AssetGrid({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <span className="text-xs text-gray-400">No preview</span>
+                <span className="text-xs text-gray-600">No preview</span>
               )}
             </button>
           ) : (
@@ -76,6 +84,16 @@ export function AssetGrid({
               {formatSize(asset.sizeBytes)}
             </p>
             <TagList tags={asset.tags} max={3} />
+            {teams && teams.length > 0 && (
+              <AddToTeam
+                assetId={asset.id}
+                filename={asset.filename}
+                teams={teams}
+              />
+            )}
+            {shareLinks && (
+              <ShareLinkButton assetId={asset.id} filename={asset.filename} />
+            )}
           </div>
         </li>
       ))}
@@ -85,6 +103,9 @@ export function AssetGrid({
 
 export function GalleryPage() {
   const { filters, offset, update } = useAssetQuery();
+  const scope = filters.scope ?? 'mine';
+  const loadTags = useCallback(() => getTags(scope), [scope]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const { page, error } = useAssetSearch(
     getAssets,
     { ...filters, limit: PAGE_SIZE, offset },
@@ -92,6 +113,20 @@ export function GalleryPage() {
   );
   const [selected, setSelected] = useState<Asset | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listTeams()
+      .then((next) => {
+        if (!cancelled) setTeams(next);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setDownloadError(getErrorMessage(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function download(asset: Asset) {
     try {
@@ -105,19 +140,65 @@ export function GalleryPage() {
 
   return (
     <div className="space-y-4">
-      <AssetFilterBar filters={filters} loadTags={getTags} onChange={update} />
+      <div role="tablist" aria-label="Gallery" className="flex gap-2">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === 'mine'}
+          onClick={() => {
+            setSelected(null);
+            update({ scope: 'mine' });
+          }}
+          className={`rounded px-3 py-1.5 text-sm ${
+            scope === 'mine'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-700'
+          }`}
+        >
+          My gallery
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === 'team'}
+          onClick={() => {
+            setSelected(null);
+            update({ scope: 'team' });
+          }}
+          className={`rounded px-3 py-1.5 text-sm ${
+            scope === 'team'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white text-gray-700'
+          }`}
+        >
+          Team gallery
+        </button>
+      </div>
 
-      {message && <p className="text-sm text-red-600">{message}</p>}
+      <AssetFilterBar filters={filters} loadTags={loadTags} onChange={update} />
+
+      {message && (
+        <p role="alert" className="text-sm text-red-600">
+          {message}
+        </p>
+      )}
       {!page && !message && <p className="text-sm text-gray-500">Loading…</p>}
       {page && page.items.length === 0 && (
-        <p className="py-10 text-center text-sm text-gray-400">
-          No assets match
+        <p className="py-10 text-center text-sm text-gray-600">
+          {scope === 'team'
+            ? 'Nothing has been shared with your teams'
+            : 'No assets match'}
         </p>
       )}
 
       {page && page.items.length > 0 && (
         <>
-          <AssetGrid items={page.items} onSelect={setSelected} />
+          <AssetGrid
+            items={page.items}
+            teams={scope === 'mine' ? teams : undefined}
+            shareLinks={scope === 'mine'}
+            onSelect={setSelected}
+          />
 
           <Pager
             offset={offset}
@@ -129,15 +210,18 @@ export function GalleryPage() {
       )}
 
       {selected && (
-        <AssetViewer
-          assetId={selected.id}
-          filename={selected.filename}
-          tags={selected.tags}
-          poster={selected.thumbnailUrl}
-          loadView={getAssetView}
-          onDownload={() => download(selected)}
-          onClose={() => setSelected(null)}
-        />
+        <div className="space-y-4">
+          <AssetViewer
+            assetId={selected.id}
+            filename={selected.filename}
+            tags={selected.tags}
+            poster={selected.thumbnailUrl}
+            loadView={getAssetView}
+            onDownload={() => download(selected)}
+            onClose={() => setSelected(null)}
+          />
+          {selected.access === 'owner' && <SharePanel assetId={selected.id} />}
+        </div>
       )}
     </div>
   );

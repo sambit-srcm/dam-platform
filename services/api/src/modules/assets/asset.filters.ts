@@ -10,6 +10,7 @@ import {
   like,
   lt,
   or,
+  sql,
 } from 'drizzle-orm';
 import {
   DOCUMENT_MIME_TYPES,
@@ -24,6 +25,9 @@ export type AssetFilters = {
   tags?: string[];
   status?: AssetStatus;
   ownerId?: string;
+  // Owned by this user, or shared with a team they belong to
+  viewerId?: string;
+  scope?: 'mine' | 'team';
   from?: string;
   to?: string;
 };
@@ -58,13 +62,29 @@ function dayAfter(date: string) {
   return new Date(new Date(`${date}T00:00:00.000Z`).getTime() + ONE_DAY_MS);
 }
 
+function teamGrant(userId: string) {
+  return sql`exists (
+    select 1 from asset_team_grants g
+    inner join team_members m on m.team_id = g.team_id
+    where g.asset_id = ${assets.id} and m.user_id = ${userId}
+  )`;
+}
+
+function visibleTo(filters: AssetFilters) {
+  if (filters.ownerId) return eq(assets.ownerId, filters.ownerId);
+  if (!filters.viewerId) return undefined;
+  if (filters.scope === 'mine') return eq(assets.ownerId, filters.viewerId);
+  if (filters.scope === 'team') return teamGrant(filters.viewerId);
+  return or(eq(assets.ownerId, filters.viewerId), teamGrant(filters.viewerId));
+}
+
 export function assetWhere(filters: AssetFilters) {
   return and(
     matchesType(filters.type),
     matchesSearch(filters.q),
     filters.tags?.length ? arrayContains(assets.tags, filters.tags) : undefined,
     filters.status ? eq(assets.status, filters.status) : undefined,
-    filters.ownerId ? eq(assets.ownerId, filters.ownerId) : undefined,
+    visibleTo(filters),
     filters.from
       ? gte(assets.createdAt, new Date(`${filters.from}T00:00:00.000Z`))
       : undefined,

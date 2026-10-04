@@ -40,6 +40,7 @@ describe('asset query kept in the address bar', () => {
       from: '2026-01-01',
       to: '2026-02-01',
       sort: 'downloadCount',
+      scope: 'mine',
     });
     expect(offset).toBe(48);
   });

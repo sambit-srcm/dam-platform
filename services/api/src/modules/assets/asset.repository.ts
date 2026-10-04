@@ -1,6 +1,12 @@
-import { assets, renditions, type NewAsset, type Db } from '@dam/db';
+import {
+  assets,
+  FIELD_LIMITS,
+  renditions,
+  type AssetStatus,
+  type Db,
+  type NewAsset,
+} from '@dam/db';
 import { and, count, desc, eq, lt, sql } from 'drizzle-orm';
-import type { AssetStatus } from '@dam/db';
 import {
   assetOrder,
   assetWhere,
@@ -38,7 +44,7 @@ export async function listAssets(
     limit: number;
     offset: number;
     sort: AssetSort;
-    ownerId: string;
+    viewerId: string;
   },
 ) {
   const where = assetWhere(filters);
@@ -58,12 +64,31 @@ export async function listAssets(
 }
 
 // Every tag in use with how many assets have it, most used first
-export async function listTags(db: Db, ownerId?: string) {
+export async function listTags(
+  db: Db,
+  viewer?: { userId: string; scope?: 'mine' | 'team' },
+) {
+  const where = !viewer
+    ? sql``
+    : viewer.scope === 'mine'
+      ? sql`where owner_id = ${viewer.userId}`
+      : viewer.scope === 'team'
+        ? sql`where exists (
+              select 1 from asset_team_grants g
+              inner join team_members m on m.team_id = g.team_id
+              where g.asset_id = assets.id and m.user_id = ${viewer.userId}
+            )`
+        : sql`where owner_id = ${viewer.userId}
+            or exists (
+              select 1 from asset_team_grants g
+              inner join team_members m on m.team_id = g.team_id
+              where g.asset_id = assets.id and m.user_id = ${viewer.userId}
+            )`;
   const { rows } = await db.execute<{ tag: string; count: number }>(sql`
     select tag, count(*)::int as count
     from (
       select unnest(tags) as tag from assets
-      ${ownerId ? sql`where owner_id = ${ownerId}` : sql``}
+      ${where}
     ) as used
     group by tag
     order by count desc, tag
@@ -98,7 +123,7 @@ export async function failAsset(db: Db, id: string, failureReason: string) {
     .update(assets)
     .set({
       status: 'failed',
-      failureReason,
+      failureReason: failureReason.slice(0, FIELD_LIMITS.failureReason),
       upload: null,
       uploadExpiresAt: null,
     })

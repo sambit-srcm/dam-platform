@@ -43,7 +43,7 @@ describe('listing assets', () => {
     limit: 10,
     offset: 20,
     sort: 'createdAt',
-    ownerId: alice.id,
+    viewerId: alice.id,
   } as const;
 
   it('gives back the rows and the total as a real number', async () => {
@@ -67,7 +67,9 @@ describe('listing tags', () => {
     const rows = [{ tag: 'sea', count: 3 }];
     const { db, stepsOf } = fakeDb({ rows });
 
-    expect(await listTags(db, alice.id)).toEqual(rows);
+    expect(await listTags(db, { userId: alice.id, scope: 'mine' })).toEqual(
+      rows,
+    );
     expect(stepsOf(0)).toEqual(['execute']);
   });
 

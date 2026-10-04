@@ -29,7 +29,8 @@ export function listAssetsController(ctx: Context) {
 
 export function listTagsController(ctx: Context) {
   return async (req: Request, res: Response) => {
-    res.json({ items: await listMyTags(ctx, currentUser(req)) });
+    const scope = z.enum(['mine', 'team']).optional().parse(req.query.scope);
+    res.json({ items: await listMyTags(ctx, currentUser(req), scope) });
   };
 }
 
