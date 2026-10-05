@@ -41,11 +41,15 @@ beforeEach(() => {
 
 describe('which screen each address shows', () => {
   it('shows the sign in form at /login', () => {
-    expect(open('/login')).toContain('No account yet?');
+    const html = open('/login');
+    expect(html).toContain('No account yet?');
+    expect(html).not.toContain('Confirm password');
   });
 
   it('shows the sign up form at /register', () => {
-    expect(open('/register')).toContain('At least 8 characters');
+    const html = open('/register');
+    expect(html).toContain('At least 8 characters');
+    expect(html).toContain('Confirm password');
   });
 
   it('shows the gallery inside the page frame at /', () => {

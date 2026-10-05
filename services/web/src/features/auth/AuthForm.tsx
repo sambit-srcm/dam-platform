@@ -2,6 +2,11 @@ import { useState, type SubmitEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { getErrorMessage } from '../../lib/http';
 import { login, register } from './api';
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  passwordError,
+} from './password';
 import { useAuthStore } from './store';
 
 type Props = { mode: 'login' | 'register' };
@@ -36,15 +41,31 @@ export function AuthForm({ mode }: Props) {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Send people back to the page that made them sign in
   const destination = (location.state as { from?: string } | null)?.from ?? '/';
+  const describedBy = [
+    mode === 'register' ? 'password-hint' : null,
+    error ? 'auth-error' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const submit = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (mode === 'register') {
+      const message = passwordError(password, confirm);
+      if (message) {
+        setError(message);
+        return;
+      }
+    }
+
     setBusy(true);
     try {
       const session = await (mode === 'login' ? login : register)({
@@ -90,29 +111,43 @@ export function AuthForm({ mode }: Props) {
             id="password"
             type="password"
             required
-            minLength={mode === 'register' ? 8 : undefined}
-            maxLength={128}
+            minLength={mode === 'register' ? MIN_PASSWORD_LENGTH : undefined}
+            maxLength={MAX_PASSWORD_LENGTH}
             autoComplete={
               mode === 'login' ? 'current-password' : 'new-password'
             }
             value={password}
             aria-invalid={error ? true : undefined}
-            aria-describedby={
-              [
-                mode === 'register' ? 'password-hint' : null,
-                error ? 'auth-error' : null,
-              ]
-                .filter(Boolean)
-                .join(' ') || undefined
-            }
+            aria-describedby={describedBy || undefined}
             onChange={(e) => setPassword(e.target.value)}
             className={inputClass}
           />
         </label>
         {mode === 'register' && (
-          <p id="password-hint" className="mt-1 text-xs text-gray-500">
-            At least 8 characters
-          </p>
+          <>
+            <label
+              htmlFor="confirm-password"
+              className="mt-4 block text-sm font-medium"
+            >
+              Confirm password
+              <input
+                id="confirm-password"
+                type="password"
+                required
+                minLength={MIN_PASSWORD_LENGTH}
+                maxLength={MAX_PASSWORD_LENGTH}
+                autoComplete="new-password"
+                value={confirm}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={describedBy || undefined}
+                onChange={(e) => setConfirm(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <p id="password-hint" className="mt-1 text-xs text-gray-500">
+              At least 8 characters
+            </p>
+          </>
         )}
 
         {error && (
