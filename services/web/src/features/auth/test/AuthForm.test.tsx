@@ -60,11 +60,32 @@ describe('AuthForm', () => {
     expect(view.container.textContent).toContain('At least 8 characters');
     await change(view.container.querySelector('#email')!, 'a@b.co');
     await change(view.container.querySelector('#password')!, 'correct-horse');
+    await change(
+      view.container.querySelector('#confirm-password')!,
+      'correct-horse',
+    );
     await submit(view.container.querySelector('form')!);
     expect(api.register).toHaveBeenCalledWith({
       email: 'a@b.co',
       password: 'correct-horse',
     });
+  });
+
+  it('asks people to type the password twice', async () => {
+    view = await mount(
+      <MemoryRouter>
+        <AuthForm mode="register" />
+      </MemoryRouter>,
+    );
+    await change(view.container.querySelector('#email')!, 'a@b.co');
+    await change(view.container.querySelector('#password')!, 'correct-horse');
+    await change(
+      view.container.querySelector('#confirm-password')!,
+      'different1',
+    );
+    await submit(view.container.querySelector('form')!);
+    expect(view.container.textContent).toContain('Passwords do not match');
+    expect(api.register).not.toHaveBeenCalled();
   });
 
   it('shows the sign-in error', async () => {
