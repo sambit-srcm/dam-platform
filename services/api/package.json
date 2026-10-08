@@ -14,20 +14,20 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1137.0",
-    "@aws-sdk/s3-request-presigner": "^3.1137.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@dam/db": "workspace:*",
     "@dam/queue": "workspace:*",
     "cors": "^2.8.6",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jose": "^6.2.12",
     "minio": "^8.0.7",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "rate-limit-redis": "^6.0.1",
-    "redis": "^6.2.1",
+    "redis": "^6.3.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

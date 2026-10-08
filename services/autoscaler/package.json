@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@dam/queue": "workspace:*",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
